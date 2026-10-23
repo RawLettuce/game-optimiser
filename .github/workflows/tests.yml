@@ -1,0 +1,29 @@
+# Full test suite on every push and pull request.
+# The tool itself is standard library only; pytest is the only thing installed, and only here in CI.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install the test runner
+        run: python -m pip install pytest
+      - name: Test suite
+        run: python -m pytest -q -rs
+      - name: Self test (no pytest)
+        run: python -m gopt selftest

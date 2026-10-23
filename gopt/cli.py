@@ -309,10 +309,10 @@ def cmd_selftest(args, paths: Paths, out) -> int:
     fix = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
     checks = 0
     for name in ("cs2_video.txt", "localconfig.vdf", "loginusers.vdf", "libraryfolders.vdf"):
-        t = (fix / name).read_text(newline="")
+        t = (fix / name).read_bytes().decode("utf-8")
         assert KeyValues(t).text == t, name
         checks += 1
-    t = (fix / "EE.cfg").read_text(newline="")
+    t = (fix / "EE.cfg").read_bytes().decode("utf-8")
     assert EECfg(t).text() == t
     checks += 1
     from .parsers.jsontext import JsonText
