@@ -13,8 +13,8 @@ from .mangohud import app_config_path, config_text, parse_log, wait_for_log
 from .metrics import Metrics, compute, classify_bound
 from .paths import Paths
 from .safety import RunDir, write_file, file_fingerprints, check_not_stale, read_text_or_refuse, sha256_of
-from .search import Search, build_ladder, describe_rung, nearest_rung
-from .steam import Steam, rewrite_launch_options
+from .search import Search, build_phases, describe_rung, nearest_rung, predicted_start
+from .steam import Steam, dlss_note, rewrite_launch_options, strip_forbidden
 
 GOAL_RE = re.compile(r"^(?:(\d{3,4})x(\d{3,4})@)?(\d{2,3}(?:\.\d+)?)$")
 PRIORITY = {"quality": (0.5, 0.6), "balanced": (0.75, 0.7), "fps": (1.0, 0.8)}
@@ -80,8 +80,12 @@ class Session:
         return app_config_path(self.paths.mangohud_dir, self.ad.program, self.ad.runtime == "proton")
 
     def launch_option_target(self) -> str:
+        return self._launch_target()[0]
+
+    def _launch_target(self) -> tuple[str, list[str]]:
         current = self.steam.get_launch_options(self.ad.appid)
-        return rewrite_launch_options(current, self.ad.launch_remove, self.ad.launch_prefix, self.ad.launch_args)
+        target = rewrite_launch_options(current, self.ad.launch_remove, self.ad.launch_prefix, self.ad.launch_args)
+        return strip_forbidden(target, self.ad.launch_forbid)
 
     # ---- plan ---------------------------------------------------------
     def plan(self, goal: str | None, priority: str | None, refresh_hz: int | None, pins: dict[str, str] | None = None,
@@ -102,13 +106,26 @@ class Session:
                     raise Refusal(f"pin {sid}={val}: not one of {s.levels} / {s.labels}")
             pin_levels[sid] = lv
         vram_cap = vram_mb * 0.92 if vram_mb else None
-        ladder = build_ladder(self.ad.settings, pin_levels, no_upscaling, vram_cap)
+        try:
+            phases = build_phases(self.ad.settings, pin_levels, no_upscaling, vram_cap)
+        except ValueError as e:
+            raise Refusal(f"adapter {self.ad.id}: {e}")
+        ladder = phases[0]["ladder"]
         start = nearest_rung(ladder, levels)
+        phases[0]["start_idx"] = start
+        for ph in phases[1:]:
+            ph["start_idx"] = None          # chosen from the calibrated model when the phase starts
         current_lo = self.steam.get_launch_options(self.ad.appid)
         auto_over, manual_over = self.ad.override_changes(values)
         warnings = []
         if res and active_mode and not active_mode.startswith(f"{res[0]}x{res[1]}"):
             warnings.append(f"goal resolution {res[0]}x{res[1]} differs from the active mode {active_mode}; the tool does not change display modes")
+        target_lo, removed = self._launch_target()
+        if removed:
+            warnings.append(f"forbidden launch option token(s) removed: {' '.join(removed)}")
+        if len(phases) > 1 and "DLSS" in phases[-1]["name"]:
+            app = self.steam.app(self.ad.appid)
+            warnings.append(dlss_note((app.compat_tool if app else None) or self.steam.proton_version(self.ad.appid)))
         unknown = [s.id for s in self.ad.settings if levels.get(s.id) is None]
         if unknown:
             warnings.append(f"current value unknown for: {', '.join(unknown)} (missing key or unrecognised value); "
@@ -116,9 +133,9 @@ class Session:
         plan = {
             "version": __version__, "game": self.ad.id, "appid": self.ad.appid, "goal": why, "goal_fps": goal_fps,
             "low_ratio": low_ratio, "headroom": self.ad.headroom, "max_runs": max_runs, "no_upscaling": no_upscaling,
-            "pins": pin_levels, "ladder": ladder, "start_idx": start, "current_levels": levels,
+            "pins": pin_levels, "ladder": ladder, "start_idx": start, "phases": phases, "current_levels": levels,
             "settings_file": str(spath), "mangohud_config": str(self.mangohud_path()),
-            "launch_options_current": current_lo, "launch_options_target": self.launch_option_target(),
+            "launch_options_current": current_lo, "launch_options_target": target_lo, "advice": self.ad.launch_advice,
             "write_launch_options": write_launch_options, "overrides_auto": auto_over,
             "overrides_manual": [{"key": o.key, "value": o.value, "manual": o.manual, "why": o.why} for o in manual_over],
             "fingerprints": file_fingerprints([spath] + ([self.steam.localconfig_path()] if write_launch_options else [])),
@@ -136,6 +153,13 @@ class Session:
                  f"  launch options wanted: {plan['launch_options_target']}"
                  + ("  (will be written to localconfig.vdf with Steam closed)" if plan["write_launch_options"]
                     else "  (paste this into Steam > game > Properties > Launch Options)")]
+        for a in plan.get("advice", []):
+            lines.append(f"  advice: {a}")
+        phases = plan.get("phases") or []
+        if len(phases) > 1:
+            lines.append(f"  search order: {phases[0]['name']} first ({len(phases[0]['ladder'])} rungs); "
+                         + "; ".join(f"only if no {phases[i - 1]['name']} rung reaches the goal: {ph['name']} "
+                                     f"({len(ph['ladder'])} rungs)" for i, ph in enumerate(phases) if i))
         if plan["overrides_auto"]:
             lines.append("  keys forced for the session: " + ", ".join(f"{k}={v}" for k, v in plan["overrides_auto"].items()))
         for o in plan["overrides_manual"]:
@@ -190,7 +214,7 @@ class Session:
 
     # ---- the loop -----------------------------------------------------
     def tune(self, plan: dict, apply: bool, log_files: list[Path] | None = None, yes: bool = False,
-             keep_hud: bool = False) -> int:
+             keep_hud: bool = False, scene: str | None = None) -> int:
         self.out(self.describe_plan(plan))
         if not apply:
             self.out("\nDry run: nothing written. Add --apply to run the loop.")
@@ -200,9 +224,7 @@ class Session:
         self.run = RunDir(self.paths.runs, RunDir.new_id(self.ad.id)).create()
         (self.run.path / "plan.json").write_text(json.dumps(plan, indent=2))
         self.say(f"run {self.run.run_id}: folder {self.run.path}")
-        ladder = plan["ladder"]
-        search = Search(self.ad, ladder, plan["goal_fps"], plan["start_idx"], low_ratio=plan["low_ratio"],
-                        max_runs=plan["max_runs"], headroom=plan["headroom"])
+        phases = plan.get("phases") or [{"name": "all settings", "ladder": plan["ladder"], "start_idx": plan["start_idx"]}]
         duration = int(plan["benchmark"].get("duration_s", 60))
         self._write_mangohud_config(duration)
         if plan["write_launch_options"]:
@@ -211,32 +233,61 @@ class Session:
             self.say(f"  Steam > {self.ad.name} > Properties > Launch Options must be exactly:\n      {plan['launch_options_target']}")
         for o in plan["overrides_manual"]:
             self.say(f"  MANUAL before the first run: {o['manual']}")
+        if not log_files:
+            self.choose_scene(scene)
         logs = list(log_files or [])
+        self._phases_done = []
         last_sha = None
+        runs_left = plan["max_runs"]
+        model = None
         try:
-            while (idx := search.next_rung()) is not None:
-                rung = ladder[idx]
-                values = self.ad.read_settings(self.settings_path())
-                changes = dict(plan["overrides_auto"]) if not search.results else {}
-                changes.update(self.ad.changes_for_rung(rung, values))
-                if last_sha is not None and sha256_of(self.settings_path()) != last_sha:
-                    self.say("  note: the settings file changed since the tool last wrote it (the game rewrote it); re-applying")
-                sha = self._apply_changes(changes, f"rung {idx}")
-                last_sha = sha or sha256_of(self.settings_path())
-                confirm = " (confirmation run)" if search._confirm_pending == idx else ""
-                self.say(f"\nRun {len(search.results) + 1}/{plan['max_runs']}: rung {idx}/{len(ladder) - 1}{confirm}\n  {describe_rung(self.ad, rung)}")
-                m = self._obtain_metrics(logs, duration)
-                rr = search.record(idx, m)
-                verdict = "PASS" if rr.passed else "FAIL (" + "; ".join(rr.reasons) + ")"
-                self.say(f"  avg {m.avg_fps} fps, 1% low {m.low1_avg_fps}, 0.1% low {m.low01_avg_fps}, spikes/min {m.spikes_per_min}, "
-                         f"GPU {m.median_gpu_load}% CPU {m.median_cpu_load}% -> {verdict}")
+            for pi, ph in enumerate(phases):
+                ladder = ph["ladder"]
+                start = ph.get("start_idx")
+                target = plan["goal_fps"] * plan["headroom"] * 1.05
+                if start is None:
+                    start = predicted_start(model, ladder, target)
+                if pi:
+                    self.say(f"\nNo {phases[pi - 1]['name']} rung reaches the goal: trying {ph['name']} "
+                             f"({runs_left} run(s) left), starting at rung {start}")
+                search = Search(self.ad, ladder, plan["goal_fps"], start, low_ratio=plan["low_ratio"],
+                                max_runs=runs_left, headroom=plan["headroom"], model=model)
+                self._seen_notes = 0
+                self._phases_done.append((ph["name"], ladder, search))
+                while (idx := search.next_rung()) is not None:
+                    rung = ladder[idx]
+                    values = self.ad.read_settings(self.settings_path())
+                    changes = dict(plan["overrides_auto"]) if self._runs_total() == 0 else {}
+                    changes.update(self.ad.changes_for_rung(rung, values))
+                    if last_sha is not None and sha256_of(self.settings_path()) != last_sha:
+                        self.say("  note: the settings file changed since the tool last wrote it (the game rewrote it); re-applying")
+                    sha = self._apply_changes(changes, f"{ph['name']} rung {idx}")
+                    last_sha = sha or sha256_of(self.settings_path())
+                    confirm = " (confirmation run)" if search._confirm_pending == idx else ""
+                    self.say(f"\nRun {self._runs_total() + 1}/{plan['max_runs']}: {ph['name']} rung {idx}/{len(ladder) - 1}"
+                             f"{confirm}\n  {describe_rung(self.ad, rung)}")
+                    m = self._obtain_metrics(logs, duration)
+                    rr = search.record(idx, m)
+                    verdict = "PASS" if rr.passed else "FAIL (" + "; ".join(rr.reasons) + ")"
+                    self.say(f"  avg {m.avg_fps} fps, 1% low {m.low1_avg_fps}, 0.1% low {m.low01_avg_fps}, spikes/min {m.spikes_per_min}, "
+                             f"GPU {m.median_gpu_load}% CPU {m.median_cpu_load}% -> {verdict}")
+                    self._print_new_notes(search)
                 self._print_new_notes(search)
-            self._print_new_notes(search)
-            return self._finish(plan, search, keep_hud)
+                runs_left -= len(search.results)
+                model = search.model
+                if search.final_rung() is not None or runs_left <= 0 or search.bound == "cpu":
+                    if search.final_rung() is None and pi + 1 < len(phases):
+                        why = "the run budget is used" if runs_left <= 0 else "the game is CPU bound (an upscaler cannot help)"
+                        self.say(f"  not trying {phases[pi + 1]['name']}: {why}")
+                    break
+            return self._finish(plan, search, keep_hud, ladder)
         except Refusal as e:
             self.say(f"REFUSED: {e}")
-            self._write_report(plan, search, None, refused=str(e))
+            self._write_report(plan, None, refused=str(e))
             raise
+
+    def _runs_total(self) -> int:
+        return sum(len(sr.results) for _, _, sr in getattr(self, "_phases_done", []))
 
     def _print_new_notes(self, search: Search):
         seen = getattr(self, "_seen_notes", 0)
@@ -249,7 +300,7 @@ class Session:
             path = logs.pop(0)
             self.say(f"  using log file {path}")
         else:
-            self.out(self.ad.benchmark.get("instructions", ""))
+            self.out(self.benchmark_instructions())
             self.ask("Press Enter when the game is closed and the run is done (the tool then waits for the log to settle)... ")
             path = wait_for_log(self.run.logs, self.ad.program, since=self.clock() - duration * 4, quiet_s=15.0,
                                 timeout_s=120.0, sleep=self.sleep, clock=self.clock)
@@ -259,34 +310,80 @@ class Session:
         except ValueError as e:
             raise Refusal(f"log {path} unusable: {e}")
 
-    def _finish(self, plan: dict, search: Search, keep_hud: bool) -> int:
-        ladder = plan["ladder"]
+    def _finish(self, plan: dict, search: Search, keep_hud: bool, ladder: list) -> int:
         final = search.final_rung()
+        phase = self._phases_done[-1][0] if getattr(self, "_phases_done", None) else ""
         if final is not None:
             values = self.ad.read_settings(self.settings_path())
             changes = self.ad.changes_for_rung(ladder[final], values)
             if changes:
                 self.say(f"\nApplying the final rung {final}: {describe_rung(self.ad, ladder[final])}")
                 self._apply_changes(changes, f"final rung {final}")
-            self.say(f"\nGOAL MET at rung {final}/{len(ladder) - 1}: {describe_rung(self.ad, ladder[final])}")
+            self.say(f"\nGOAL MET ({phase}) at rung {final}/{len(ladder) - 1}: {describe_rung(self.ad, ladder[final])}")
             goal_met = True
         else:
             goal_met = False
-            best_fail = max(search.results, key=lambda r: r.metrics.avg_fps) if search.results else None
-            if best_fail is not None:
-                self.say(f"\nGoal not met. Best measured: rung {best_fail.rung_idx} at {best_fail.metrics.avg_fps} fps "
-                         f"({describe_rung(self.ad, ladder[best_fail.rung_idx])}). Leaving the lowest measured rung applied.")
-                lowest = min(search.results, key=lambda r: r.rung_idx).rung_idx
+            measured = [(pi, n, lad, r) for pi, (n, lad, sr) in enumerate(self._phases_done) for r in sr.results]
+            if measured:
+                # fastest measured configuration; ties go to the later phase and the lower rung
+                _, n, lad, best = max(measured, key=lambda x: (x[3].metrics.avg_fps, x[0], -x[3].rung_idx))
+                self.say(f"\nGoal not met. Best measured: {n} rung {best.rung_idx} at {best.metrics.avg_fps} fps "
+                         f"({describe_rung(self.ad, lad[best.rung_idx])}). Leaving it applied.")
                 values = self.ad.read_settings(self.settings_path())
-                ch = self.ad.changes_for_rung(ladder[lowest], values)
+                ch = self.ad.changes_for_rung(lad[best.rung_idx], values)
                 if ch:
-                    self._apply_changes(ch, f"best effort rung {lowest}")
+                    self._apply_changes(ch, f"best effort {n} rung {best.rung_idx}")
         if not keep_hud:
             self._restore_mangohud()
         self._save_learned(search)
-        self._write_report(plan, search, final)
+        self._write_report(plan, (phase, ladder, final))
         self.say(f"\nUndo everything from this run: python3 -m gopt undo {self.run.run_id}")
         return 0 if goal_met else 2
+
+    # ---- benchmark scene ---------------------------------------------
+    def scene_options(self) -> list[dict]:
+        return list(self.ad.benchmark.get("scene_options", []))
+
+    def chosen_scene(self) -> dict | None:
+        return self.ad.learned.get("benchmark_scene")
+
+    def choose_scene(self, scene: str | None = None) -> dict | None:
+        """First run: offer the adapter's heavy, repeatable scenes and remember the choice in the
+        learned file, so every later run uses the same one. `scene` (number or name) skips the question."""
+        opts = self.scene_options()
+        if not opts:
+            return None
+        cur = self.chosen_scene()
+        if cur and scene is None:
+            self.say(f"  benchmark scene: {cur['name']} (chosen {cur.get('date', '?')}; --scene changes it)")
+            return cur
+        if scene is None:
+            self.out(f"\nPick the benchmark scene for {self.ad.name}; every run uses the same one:")
+            for i, o in enumerate(opts, 1):
+                self.out(f"  {i}. {o['name']}: {o['why']}")
+            self.out("  or type the name of another scene you own")
+            scene = self.ask("Scene number or name: ").strip()
+        pick = None
+        if scene.isdigit() and 1 <= int(scene) <= len(opts):
+            pick = dict(opts[int(scene) - 1])
+        elif scene:
+            pick = next((dict(o) for o in opts if o["name"].lower() == scene.lower()),
+                        {"name": scene, "why": "chosen by hand", "setup": ""})
+        if not pick:
+            raise Refusal("no benchmark scene chosen")
+        pick["date"] = time.strftime("%Y-%m-%d")
+        data = dict(self.ad.learned)
+        data["benchmark_scene"] = pick
+        self.ad.save_learned(data)
+        self.say(f"  benchmark scene: {pick['name']} (saved to {self.ad.learned_path().name})")
+        return pick
+
+    def benchmark_instructions(self) -> str:
+        text = self.ad.benchmark.get("instructions", "")
+        sc = self.chosen_scene()
+        if sc:
+            text = text.replace("{scene}", sc["name"]).replace("{scene_setup}", sc.get("setup") or "")
+        return text.replace("{scene}", "the scene you chose").replace("{scene_setup}", "")
 
     def _restore_mangohud(self):
         mp = str(self.mangohud_path())
@@ -305,28 +402,40 @@ class Session:
         except OSError as e:
             self.say(f"  could not save learned model: {e}")
 
-    def _write_report(self, plan: dict, search: Search, final: int | None, refused: str | None = None):
+    def _write_report(self, plan: dict, result: tuple | None, refused: str | None = None):
         if self.run is None:
             return
-        ladder = plan["ladder"]
+        phases = getattr(self, "_phases_done", [])
+        total = sum(len(sr.results) for _, _, sr in phases)
+        first = phases[0][2] if phases else None
         lines = [f"game-optimiser {__version__} report, run {self.run.run_id}, {time.strftime('%Y-%m-%d %H:%M:%S')}",
                  f"game: {self.ad.name}  goal: {plan['goal']}  headroom x{plan['headroom']}",
-                 f"bound: {search.bound}  noise margin: {search.margin:.3f}  runs: {len(search.results)}/{plan['max_runs']}", ""]
-        for i, r in enumerate(search.results, 1):
-            m = r.metrics
-            lines.append(f"run {i}: rung {r.rung_idx} {'confirm ' if r.confirm else ''}{'PASS' if r.passed else 'FAIL'} "
-                         f"avg {m.avg_fps} low1 {m.low1_avg_fps} low01 {m.low01_avg_fps} spikes/min {m.spikes_per_min} "
-                         f"gpu {m.median_gpu_load} cpu {m.median_cpu_load} vram {m.max_vram_mb}")
-            lines.append(f"       {describe_rung(self.ad, ladder[r.rung_idx])}")
-            if r.reasons:
-                lines.append(f"       reasons: {'; '.join(r.reasons)}")
+                 f"bound: {first.bound if first else 'unknown'}  noise margin: {first.margin if first else 0:.3f}  "
+                 f"runs: {total}/{plan['max_runs']}"]
+        sc = self.chosen_scene()
+        if sc:
+            lines.append(f"benchmark scene: {sc['name']}")
         lines.append("")
-        for n in search.notes:
-            lines.append(f"note: {n}")
+        i = 0
+        for name, ladder, sr in phases:
+            lines.append(f"phase: {name} ({len(ladder)} rungs)")
+            for r in sr.results:
+                i += 1
+                m = r.metrics
+                lines.append(f"run {i}: rung {r.rung_idx} {'confirm ' if r.confirm else ''}{'PASS' if r.passed else 'FAIL'} "
+                             f"avg {m.avg_fps} low1 {m.low1_avg_fps} low01 {m.low01_avg_fps} spikes/min {m.spikes_per_min} "
+                             f"gpu {m.median_gpu_load} cpu {m.median_cpu_load} vram {m.max_vram_mb}")
+                lines.append(f"       {describe_rung(self.ad, ladder[r.rung_idx])}")
+                if r.reasons:
+                    lines.append(f"       reasons: {'; '.join(r.reasons)}")
+            for n in sr.notes:
+                lines.append(f"note: {n}")
+        lines.append("")
+        final = result[2] if result else None
         if refused:
             lines.append(f"REFUSED: {refused}")
         elif final is not None:
-            lines.append(f"result: GOAL MET at rung {final}: {describe_rung(self.ad, ladder[final])}")
+            lines.append(f"result: GOAL MET ({result[0]}) at rung {final}: {describe_rung(self.ad, result[1][final])}")
         else:
             lines.append("result: goal not met; see notes")
         lines.append("")
@@ -336,8 +445,10 @@ class Session:
         lines.append(f"undo: python3 -m gopt undo {self.run.run_id}")
         (self.run.path / "game-optimiser-report.txt").write_text("\n".join(lines) + "\n")
         (self.run.path / "metrics.json").write_text(json.dumps(
-            {"runs": [{"rung": r.rung_idx, "passed": r.passed, "confirm": r.confirm, "metrics": r.metrics.as_dict()} for r in search.results],
-             "notes": search.notes, "final": final, "bound": search.bound}, indent=2))
+            {"phases": [{"name": n, "bound": sr.bound, "notes": sr.notes,
+                         "runs": [{"rung": r.rung_idx, "passed": r.passed, "confirm": r.confirm,
+                                   "metrics": r.metrics.as_dict()} for r in sr.results]} for n, _, sr in phases],
+             "final": {"phase": result[0], "rung": final} if result else None}, indent=2))
 
     # ---- measure only -------------------------------------------------
     def measure(self, log_file: Path | None, duration: int = 60, free_play: bool = False) -> Metrics:
@@ -346,7 +457,9 @@ class Session:
             self.run = RunDir(self.paths.runs, RunDir.new_id(self.ad.id + "-measure")).create()
             self._write_mangohud_config(duration if not free_play else 600)
             self.say(f"  Steam launch options must contain: {self.launch_option_target()}")
-            self.out(self.ad.benchmark.get("instructions", "") if not free_play else "Play normally; Shift+F2 starts the log.")
+            if not free_play:
+                self.choose_scene()
+            self.out(self.benchmark_instructions() if not free_play else "Play normally; Shift+F2 starts the log.")
             self.ask("Press Enter when the game is closed... ")
             path = wait_for_log(self.run.logs, self.ad.program, since=0, quiet_s=15.0, timeout_s=120.0,
                                 sleep=self.sleep, clock=self.clock)

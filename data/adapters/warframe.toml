@@ -19,7 +19,14 @@ status = "S"
 remove_patterns = ["gamescope"]
 ensure_prefix = "mangohud"
 ensure_args = []
-forbid = ["PROTON_USE_WINED3D", "-high", "LD_PRELOAD"]
+forbid = ["PROTON_USE_WINED3D", "-high", "LD_PRELOAD", "--force-grab-cursor"]
+# Printed with every plan. Target: native borderless on the AGON, no Gamescope (its --force-grab-cursor kept the
+# cursor grabbed, seen on the PC 23 Oct 2026). Warframe opened on the LG that night: a KWin rule pins it to DP-2.
+advice = [
+  "Display Mode: Options > Display > Display Mode = Borderless Fullscreen, Resolution 3840x2160 (no Gamescope: the cursor is free to leave the game)",
+  "KWin rule (once): System Settings > Window Management > Window Rules > Add New. Window class (application): Substring Match 'steam_app_230410' (check with Detect Window Properties while Warframe runs). Add Property > Screen: Force, pick the AGON (DP-2). Apply.",
+  "If borderless still loses keyboard focus at 150% scaling: try Display Mode = Fullscreen next (DESIGN.md section 10, E1b), then the Wayland driver (E3)",
+]
 
 # Keys forced for the duration of a tuning session and restored afterwards (by undo of the session's backups).
 [[run_overrides]]
@@ -53,6 +60,9 @@ cost = [1.00, 1.18, 1.42, 1.82]
 cpu = false
 visual = 3
 upscaling = true
+# Native first; DLSS Quality only when no native rung reaches the goal (Matthew, 23 Oct 2026).
+# Proton 9+ enables DXVK-NVAPI by default and copies nvngx.dll into the prefix (ADAPTERS-RESEARCH.md 1.7).
+fallback = "DLSS_QUALITY"
 status = "U"
 
 [[settings]]
@@ -184,9 +194,28 @@ confirm_duration_s = 90
 instructions = """
 Warframe benchmark (same every run, about 60 s):
  1. Start the game from Steam with the launch option set as printed above.
- 2. Open the Captura scene you chose for benchmarking (same scene every time).
- 3. Stand on your marked spot. Press Shift+F2 to start the MangoHud log.
+ 2. Arsenal > Appearance > Captura, open {scene} (the same scene every run). {scene_setup}
+ 3. Stay at the spawn point. Press Shift+F2 to start the MangoHud log.
  4. Do one slow full turn (about 15 s), then spawn 3 enemies and fire at them for 20 s.
  5. Stay still for the remaining time. The log stops by itself after 60 s.
  6. Quit the game fully (the tool refuses to edit files while it runs).
 """
+
+# Offered on the first run; the choice is saved in warframe.learned.json and reused (`--scene` changes it).
+# All three are open world landscape tiles (WFCD warframe-items, PhotoboothTile*Landscape / PlainsOfEidolon),
+# the heaviest kind of scene: long draw distance, foliage, volumetrics. Time of day and rain only exist in open
+# world scenes and must be the same every run [S 25]. Ownership is [U]: they are tradable scene items.
+[[benchmark.scene_options]]
+name = "Plains Of Eidolon Scene"
+why = "open world (Cetus), dense foliage and water, long view distance"
+setup = "Set Time of Day to noon (slider centred) and rain off, every run."
+
+[[benchmark.scene_options]]
+name = "Orb Vallis Scene"
+why = "open world (Fortuna), snow, wide vistas and many lights"
+setup = "Set Time of Day to noon (slider centred) and snow off, every run."
+
+[[benchmark.scene_options]]
+name = "Deimos Cambion Drift Scene"
+why = "open world (Necralisk), organic geometry and heavy fog and volumetrics"
+setup = "Set Time of Day to noon (slider centred), every run."

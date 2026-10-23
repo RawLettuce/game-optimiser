@@ -82,8 +82,9 @@ All commands run as the normal user. Fingerprint = sha256 of the probe JSON minu
 | RAM total | `/proc/meminfo` MemTotal | standard |
 | GPU name, VRAM, driver | `nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader` (read only queries need no root) [S 22] | V on PC |
 | Resizable BAR | `nvidia-smi -q -d MEMORY` BAR1 total 8192 MiB on this PC [V]; fallback `/sys/bus/pci/devices/<gpu>/resource` region 1 size | V |
-| Outputs, active mode, refresh, scale | `kscreen-doctor -o` (active mode marked `*`) [S 21]; `kscreen-doctor --json` [U] | S |
-| Connected connectors and modes | `/sys/class/drm/card*-DP-2/{status,modes}` | standard |
+| Outputs, active mode, refresh, scale | `kscreen-doctor -j` first (exists on Plasma 6.7.5, seen 23 Oct 2026 [V]), `kscreen-doctor -o` text as fallback; both parsers tested on the PC's real output [P 47] | V |
+| Connected connectors and modes | `/sys/class/drm/card*-*/{status,modes,edid}`: sizes deduplicated, preferred (native) size first, EDID monitor name; sizes above native are scaler inputs (the LG's EDID offers 3840x2160 over HDMI [V 23 Oct 2026]; its panel is 2560x1440) | V |
+| Native or Proton per game | `config/config.vdf` CompatToolMapping per appid [P 51], else the install folder's binaries (Linux ELF executable: native; only `.exe`: Proton), else `compatdata/<appid>` shown as `proton?`. A compatdata folder alone misled the first version: CS2 is native but has one [V 23 Oct 2026] | P |
 | Steam root and libraries | `~/.local/share/Steam`, then `steamapps/libraryfolders.vdf` paths [S 19] | S |
 | Steam user | `config/loginusers.vdf`, entry with `mostrecent 1`; steamid3 = steamid64 minus 76561197960265728 [S 19] | S |
 | Proton version per game | `steamapps/compatdata/<appid>/version` [U] and `config/config.vdf` CompatToolMapping [U] | U |
@@ -185,6 +186,9 @@ Each play run costs Matthew about two minutes, so the search is designed around 
 Measured pass or fail decides, never the model. If a higher rung passed while a lower one failed (noise), the lower rung is preferred and the inversion is reported. A failing rung is never reported as passing.
 7. Stop early when the top rung passes (goal met at max quality) or the bottom rung fails (report the best found and the bound classification). In the CPU bound case the tool says plainly that graphics settings cannot reach the goal and reports what the GPU side headroom is worth instead.
 
+### 8.2a Native first, upscaling only as a fallback (Matthew's decision, 23 Oct 2026)
+DLSS is allowed, but native resolution comes first. For an adapter whose upscaling setting names a `fallback` level (Warframe: DLSS Quality; CS2: FSR Quality), the plan holds two ladders: the native ladder (upscaler pinned Off) and the fallback ladder (upscaler pinned at the fallback level, never Balanced or Performance). The search runs the native ladder first; only when no native rung passes (the bottom rung fails) does it move to the fallback ladder with the remaining run budget, starting where the cost model calibrated on the native runs predicts the goal is met. When the baseline shows the goal is far out of reach (nothing in the bracket is predicted to pass) the bottom rung is measured next, so an unreachable native goal costs one run rather than a bisection. A CPU bound result skips the fallback (an upscaler only removes GPU work). `--no-upscaling` keeps the native ladder only; `--pin upscaling=...` replaces both with one ladder. If neither ladder reaches the goal, the fastest measured configuration is left applied (ties go to the fallback ladder's lowest rung). [V on PC: not yet]
+
 Priority mode (quality, balanced, fps) with no numeric goal maps to a goal of the display refresh rate x {0.5, 0.75, 1.0} and a 1 percent low ratio of {0.6, 0.7, 0.8}; the tool prints the derived goal before planning.
 
 ### 8.3 Pass criteria
@@ -212,6 +216,7 @@ Per game notes:
 - CS2 is native Vulkan, one process, one log. MangoHud is the same tool behind the Steam Deck's performance overlay [S 5], so it is in wide use with CS2 on Linux; the wrapper is still removed from the launch options at the end of a session by default.
 
 Benchmark scenes (sections per game):
+- Warframe scene choice (23 Oct 2026): on the first tuning run the tool offers three heavy, repeatable Captura scenes (Plains Of Eidolon, Orb Vallis, Deimos Cambion Drift: open world landscape tiles per WFCD's item data [P 50], with the time of day and rain sliders fixed every run) or any other owned scene by name, and stores the choice in `warframe.learned.json` (`--scene` changes it). The run instructions name the chosen scene.
 - Warframe. No built in benchmark. Captura has 34 scenes, a movable camera while paused, slow motion, and can spawn up to three enemies from completed scans [S 25], so it is repeatable and offline. Proposed scene: one owned Captura scene, standing at a marked spot, one slow full turn, then spawn three enemies and fire for 20 s; 60 s total, same every run. Because missions with four players and heavy effects are heavier than Captura, the adapter applies `headroom = 1.25` by default, calibrated once by letting MangoHud log a real mission (`gopt measure warframe --free-play`) and comparing its average with the Captura run; the learned headroom replaces the default. Reviewers discard the first run after a settings change and expect about 1 percent spread between repeats [S 26]; the tool therefore ignores the first 10 s of every log (shader compile, DX12 shader caching stutter is reported for Warframe [S 27]).
 - CS2. Workshop map "CS2 FPS BENCHMARK DUST2" (id 3240880604, by Angel, created 6 May 2024) runs an automated flythrough with grenades, smokes and gunfire, starts automatically on map load, has its last four bots stationary for consistency and prints Avg FPS and P1 (1 percent low) to the console [S 17, S 18]. MangoHud is the primary measurement so both games use one method; the map's console numbers are a cross check, captured with `-condebug` to `console.log` (its CS2 Linux path is [U]) [S 28]. Runs are 60 s to 90 s and the first 10 s are ignored.
 
@@ -225,10 +230,13 @@ Experiments, run in this order, each one its own rung confirmed by Matthew's y/n
 
 | E | Launch options | Game settings | KDE setting (manual) | Expectation |
 |---|---|---|---|---|
-| E1 | gamescope removed, `MANGOHUD_CONFIGFILE=... mangohud %command%` | Display Mode Fullscreen, resolution 3840x2160 explicit, Max Framerate off | unchanged | XWayland fullscreen; checks whether gamescope is still needed at all |
+| E1 | gamescope removed, `mangohud %command%` | Display Mode Borderless Fullscreen, resolution 3840x2160, Max Framerate off | KWin window rule: class `steam_app_230410` (substring), Screen Force = AGON (DP-2) | native borderless on the AGON with a free cursor (Matthew's target, 23 Oct 2026) |
+| E1b | as E1 | Display Mode Fullscreen | same rule | only if borderless loses keyboard focus at 150 percent scaling [S 33] |
 | E2 | as E1 | as E1 | Legacy applications (X11): Apply scaling themselves | removes compositor scaling of the game window; may make other X11 apps small |
 | E3 | `PROTON_ENABLE_WAYLAND=1 MANGOHUD_CONFIGFILE=... mangohud %command% --in-process-gpu` with GE-Proton 10 or newer selected in Steam by Matthew | as E1 | back to default | native Wayland, no XWayland scaling; NVIDIA plus Wine Wayland maturity is the risk |
-| E4 | gamescope kept with minimal flags (`-W 3840 -H 2160 -r 240 -f --force-grab-cursor`) | as E1 | default | fallback only, with Matthew's explicit OK, since he wants gamescope gone |
+| E4 | gamescope kept with minimal flags (`-W 3840 -H 2160 -r 240 -f`, never `--force-grab-cursor`) | as E1 | default | fallback only, with Matthew's explicit OK, since he wants gamescope gone |
+
+Seen on the PC, 23 Oct 2026 [V]: with the gamescope stopgap Warframe opened on the LG (HDMI-A-1, left, position 0,0) and `--force-grab-cursor` kept the cursor grabbed. XWayland games tend to open at the origin of the X screen, which is the LG's top left here, hence the KWin rule. KWin stores the rule's screen as an integer index (`screen`, `screenrule` in rulesettings.kcfg [P 48]), so the rule is made in System Settings, whose dropdown shows the output names, not written by the tool. Proton windows carry the class `steam_app_<appid>` [S 49]; confirm with Detect Window Properties. The adapter prints these steps with every plan (`advice` in warframe.toml) and `--force-grab-cursor` is now a forbidden launch token, stripped with a warning.
 
 The first experiment that passes the y/n becomes the launch profile for the rest of the tuning run. E2 is a KDE System Settings change Matthew makes by hand; the tool prints the step and records the answer, it does not edit kwinrc.
 
@@ -332,6 +340,13 @@ Primary (read directly):
 - P15 real cs2_video.txt, raw.githubusercontent.com/gucu112/cs2-config/master/cs2_video.txt.
 - P23 Jamieson and Talwalkar, Non-stochastic Best Arm Identification and Hyperparameter Optimization, PMLR 51:240-248, 2016, proceedings.mlr.press/v51/jamieson16.html.
 - P42 Proton README (proton_10.0 branch), raw.githubusercontent.com/ValveSoftware/Proton/proton_10.0/README.md (PROTON_LOG, PROTON_USE_WINED3D, PROTON_NO_ESYNC, user_settings.py; runtime options do not change the prefix).
+- P44 Proton launcher script, proton_10.0 branch, raw.githubusercontent.com/ValveSoftware/Proton/proton_10.0/proton (NVAPI on unless `disablenvapi`; copies `nvngx.dll` and `_nvngx.dll` from `<libGLX_nvidia dir>/nvidia/wine` into the prefix's system32; Warframe 230410 is not on the disable list).
+- P45 DXVK-NVAPI README, raw.githubusercontent.com/jp7677/dxvk-nvapi/master/README.md ("Proton 9.0 or newer includes DXVK-NVAPI and enables it by default for all titles with a few exceptions"; DLSS for D3D11 and D3D12; Turing or newer on the proprietary driver).
+- P46 DXVK-NVAPI wiki, Tips and tricks, raw.githubusercontent.com/wiki/jp7677/dxvk-nvapi/Tips-and-tricks-for-usage-with-DXVK-NVAPI.md (nvngx.dll in system32, copied by Proton; NGXCore FullPath registry key).
+- P47 libkscreen ConfigSerializer and kscreen-doctor, raw.githubusercontent.com/KDE/libkscreen/master/src/configserializer.cpp and src/doctor/doctor.cpp (JSON keys `currentModeId`, `preferredModes`, `modes[].refreshRate`; text modes printed `id:WxH@RR.RR` with `*` current and `!` preferred).
+- P48 KWin rule settings, raw.githubusercontent.com/KDE/kwin/master/src/rulesettings.kcfg (`wmclass`, `screen` is an Int index, `screenrule`).
+- P50 WFCD warframe-items Misc.json, raw.githubusercontent.com/WFCD/warframe-items/master/data/json/Misc.json (Captura scene items and their unique names).
+- P51 protontricks steam.py, raw.githubusercontent.com/Matoking/protontricks/master/src/protontricks/steam.py (CompatToolMapping under InstallConfigStore/Software/Valve/Steam in config/config.vdf; "0" is the global default).
 - P43 ValvePython vdf README, raw.githubusercontent.com/ValvePython/vdf/master/README.rst (reference for the KeyValues format if a dependency is ever accepted).
 
 Secondary (search engine quotations of pages this container could not open):
@@ -368,4 +383,5 @@ Secondary (search engine quotations of pages this container could not open):
 - S38 WineHQ bug 57635 thread, Warframe launcher fixed by `%command% --in-process-gpu`, list.winehq.org.
 - S39 Proton 10.0-2 RC notes, gamingonlinux.com/2025/07/proton-10-0-2-gets-a-small-release-candidate-update-for-linux-steamos-steam-deck.
 - S40 CS2 VRAM by preset at 4K and FSR gains, pcoptimizedsettings.com/counter-strike-2-optimization-2024-cs2-optimized-settings/.
+- S49 Proton window class `steam_app_<appid>`, NixOS wiki Steam page, wiki.nixos.org/wiki/Steam (StartupWMClass for Proton games).
 - S41 NVIDIA developer forum, DirectX12 performance is terrible on Linux, forums.developer.nvidia.com/t/directx12-performance-is-terrible-on-linux/303207.

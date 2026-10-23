@@ -168,3 +168,24 @@ def test_library_cli_prints_detected_runtime(steam, tmp_path, monkeypatch):
     cli.main(["library"], out=lines.append, paths=Paths(tmp_path / "h"))
     row = [l for l in lines if "Counter-Strike 2" in l][0]
     assert " native " in row
+
+
+
+def test_forbidden_tokens_are_stripped_and_dlss_note():
+    from gopt.steam import strip_forbidden, proton_major, dlss_note
+    out, removed = strip_forbidden("PROTON_USE_WINED3D=1 mangohud %command% -high", ["PROTON_USE_WINED3D", "-high"])
+    assert out == "mangohud %command%" and removed == ["PROTON_USE_WINED3D=1", "-high"]
+    assert proton_major("GE-Proton10-25") == 10 and proton_major("proton_9") == 9
+    assert proton_major("proton-8.0-5") == 8 and proton_major("proton_experimental") == 99 and proton_major(None) is None
+    assert "PROTON_ENABLE_NVAPI=1" in dlss_note("proton_8")
+    assert "nothing to add" in dlss_note("GE-Proton10-25") and "unknown" in dlss_note(None)
+
+
+def test_warframe_target_drops_gamescope_and_grab_cursor(steam):
+    from gopt.adapters import Adapter
+    from gopt.session import Session
+    from gopt.paths import Paths
+    sess = Session(Adapter.load("warframe"), Steam(steam["root"]), Paths(steam["home"]))
+    assert sess.launch_option_target() == "mangohud %command%"
+    assert any("Borderless" in a for a in sess.ad.launch_advice)
+    assert any("steam_app_230410" in a and "DP-2" in a for a in sess.ad.launch_advice)

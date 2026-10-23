@@ -56,10 +56,21 @@ Prediction for the default goal (3840x2160 at 90 fps) on the RTX 3070: unlikely 
 ### 1.5 Benchmark method for Warframe
 Captura (34 scenes, pausable camera, up to three spawned enemies) [S 25] as described in DESIGN.md 9: fixed spot, one slow full turn, spawn three enemies, fire for 20 s, 60 s total; ignore the first 10 s; headroom 1.25 until calibrated by one logged real mission. Max Framerate off and VSync off during runs.
 
+### 1.5a Benchmark scene choice (23 Oct 2026)
+Three heavy, repeatable Captura scenes are offered on the first run (Matthew picks; the choice is saved): Plains Of Eidolon Scene, Orb Vallis Scene, Deimos Cambion Drift Scene. All three are open world landscape tiles in WFCD's item data (unique names `PhotoboothTile...`, tradable) [P 50]; open world scenes are the heaviest (long draw distance, foliage, fog) and are the only ones with time of day and rain sliders, which are set the same every run [S 25]. Which of them Matthew owns is [U]; any other owned scene can be typed in instead. Dense alternatives if none is owned: Höllvanian Intersection In Winter Scene (1999 city) or Castle Town Scene (Duviri) [P 50].
+
 ### 1.6 Safe launch options for Warframe
 - Allowed: `MANGOHUD_CONFIGFILE=<path> mangohud %command%` [P 1]; `%command% --in-process-gpu` (launcher fix under the Wine Wayland driver) [S 38]; `PROTON_ENABLE_WAYLAND=1` only with a Proton that exposes it (GE-Proton 10 or newer) [S 36].
 - Removed: anything containing `gamescope` (the stopgap).
 - Never set: `PROTON_USE_WINED3D` (OpenGL path, slower) [P 42], `LD_PRELOAD` hacks, anything that injects. Proton's documented variables do not change the prefix [P 42], so launch option experiments are fully reversible by rewriting the string.
+
+### 1.7 DLSS under Proton on the NVIDIA proprietary driver (checked 23 Oct 2026)
+- Policy: native first, DLSS Quality only when no native rung reaches the goal (DESIGN.md 8.2a).
+- Proton 9.0 and newer ship DXVK-NVAPI and enable it by default for all titles except a short list [P 45]; Warframe (230410) is not on the `disablenvapi` list in the Proton 10 launcher script [P 44]. Older Proton needed `PROTON_ENABLE_NVAPI=1`; the plan prints this only when the mapped Proton is older than 9.
+- DLSS also needs `nvngx.dll` and `_nvngx.dll` in the prefix's system32. Proton copies both from the driver's `nvidia/wine` folder next to `libGLX_nvidia.so.0` when NVAPI is on [P 44, P 46]. On Bazzite that folder is expected at `/usr/lib64/nvidia/wine/` [U].
+- DXVK-NVAPI supports DLSS on D3D11 and D3D12 and needs a Turing or newer GPU on the proprietary driver [P 45]: the RTX 3070 (Ampere) qualifies. DLSS 1.x is not supported under Proton [P 46]; Warframe's DLSS is 2.x or newer [U].
+- Whether Warframe offers DLSS in its Upscaling menu under DirectX 11 or only DirectX 12 was not found in any reachable source [U]; check the menu on the PC.
+- Checks on the PC: `ls /usr/lib64/nvidia/wine/`, and after one launch `ls "$HOME/.local/share/Steam/steamapps/compatdata/230410/pfx/drive_c/windows/system32/" | grep -i nvngx`.
 
 ## 2. Counter-Strike 2 (native Linux, app 730)
 
@@ -122,7 +133,7 @@ Workshop map 3240880604 "CS2 FPS BENCHMARK DUST2" by Angel: automated flythrough
 9. `ls steamapps/compatdata/230410/` for a `version` file; read `config/config.vdf` CompatToolMapping for 230410.
 
 ## Sources
-P1, P2, P3, P15, P42 as in DESIGN.md.
+P1, P2, P3, P15, P42, P44 to P51 as in DESIGN.md.
 - S9 to S13, S14, S16, S17, S18, S25, S27, S28, S29, S33, S36, S38, S40, S41 as in DESIGN.md.
 - S44 Escapist, Best Graphics Settings for Warframe, escapistmagazine.com/best-graphics-settings-for-warframe/ (launcher: DirectX 12 (Beta), Enhanced engine; Fullscreen).
 - S45 dtgre, Best Graphics Settings for Warframe 1999 Patch, dtgre.com/2024/12/best-graphics-settings-for-warframe.html (shadows Medium, VSync off, DLSS Quality, Fullscreen) and Escapist (DoF on, Distortions, Glare, Film Grain off, Bloom on, Dynamic Resolution off).

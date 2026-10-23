@@ -164,7 +164,11 @@ def test_tune_warframe_goal_not_met_exit_2_and_lowest_rung_left(env):
     cfg = s["eecfg"].read_text()
     assert "Graphics.AutoDetectGraphicsSettings=0" in cfg
     assert "Graphics.ShadowQuality=SQ_LOW" in cfg
-    assert "Graphics.Upscaling=DLSS_PERFORMANCE" in cfg
+    # native first, then DLSS Quality only (never Balanced or Performance), fastest measured rung left applied
+    assert "Graphics.Upscaling=DLSS_QUALITY" in cfg
+    i_native, i_dlss = text.index("native rung"), text.index("trying DLSS Quality")
+    assert i_native < i_dlss and "Upscaling=Off (native)" in text[:i_dlss]
+    assert "DLSS Performance" not in text.split("search order")[1] and "DLSS Balanced" not in text
     # key bindings untouched
     assert "MOVE_FORWARD=W" in cfg
 
@@ -256,3 +260,27 @@ def test_selftest_and_report(env):
     assert code == 0 and "checks passed" in text
     code, text = run(["report", "nope"], env)
     assert code == 3
+
+
+def test_scene_is_offered_once_and_remembered(env):
+    from gopt.adapters import Adapter
+    from gopt.session import Session
+    from gopt.steam import Steam
+    asked = []
+    ad = Adapter.load("warframe")
+    sess = Session(ad, Steam(env["steam"]["root"]), env["paths"], out=lambda *a: None,
+                   ask=lambda q: asked.append(q) or "2")
+    pick = sess.choose_scene()
+    assert pick["name"] == ad.benchmark["scene_options"][1]["name"] and len(asked) == 1
+    assert sess.choose_scene()["name"] == pick["name"] and len(asked) == 1      # remembered, not asked again
+    again = Adapter.load("warframe")
+    assert again.learned["benchmark_scene"]["name"] == pick["name"]
+    assert pick["name"] in Session(again, Steam(env["steam"]["root"]), env["paths"]).benchmark_instructions()
+    # --scene overrides with a name that is not on the list
+    assert sess.choose_scene("Cetus Scene")["name"] == "Cetus Scene"
+
+
+def test_warframe_offers_two_or_three_scenes():
+    from gopt.adapters import Adapter
+    opts = Adapter.load("warframe").benchmark["scene_options"]
+    assert 2 <= len(opts) <= 3 and all(o["name"] and o["why"] and o["setup"] for o in opts)

@@ -131,6 +131,8 @@ def cmd_show(args, paths: Paths, out) -> int:
     for o in ad.overrides:
         out(f"{'[override] ' + o.key:69} {str(vals.get(o.key)):16} wanted {o.value:9} {o.status}")
     out(f"launch options: {steam.get_launch_options(ad.appid) or '(none)'}")
+    for a in ad.launch_advice:
+        out(f"advice: {a}")
     runs = sorted(p.name for p in paths.runs.glob(f"*-{ad.id}")) if paths.runs.exists() else []
     out(f"runs: {', '.join(runs[-5:]) if runs else 'none'}")
     return 0
@@ -167,7 +169,7 @@ def cmd_plan(args, paths: Paths, out) -> int:
 def cmd_tune(args, paths: Paths, out) -> int:
     sess, plan = _common_plan(args, paths, out)
     logs = [Path(p) for p in (args.log_file or [])]
-    return sess.tune(plan, apply=args.apply, log_files=logs, yes=args.yes, keep_hud=args.keep_hud)
+    return sess.tune(plan, apply=args.apply, log_files=logs, yes=args.yes, keep_hud=args.keep_hud, scene=args.scene)
 
 
 def cmd_apply(args, paths: Paths, out) -> int:
@@ -318,6 +320,7 @@ def build_parser() -> argparse.ArgumentParser:
             s.add_argument("--log-file", action="append", help="use these MangoHud CSVs instead of waiting (repeatable)")
             s.add_argument("--yes", action="store_true", help="answer YES to the launch option write prompt")
             s.add_argument("--keep-hud", action="store_true", help="leave the MangoHud per-app config in place")
+            s.add_argument("--scene", help="benchmark scene: a number from the offered list or a scene name (saved)")
         s.set_defaults(fn=fn)
 
     s = sub.add_parser("apply", help="run a saved plan")

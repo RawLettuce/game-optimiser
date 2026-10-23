@@ -37,6 +37,8 @@ cost = [1.00, 1.15, 1.29, 1.38, 1.54]
 cpu = false
 visual = 3
 upscaling = true
+# Native first; FSR Quality only when no native rung reaches the goal (same rule as DLSS for Warframe).
+fallback = "2"
 status = "U"
 
 [[settings]]

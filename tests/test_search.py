@@ -216,3 +216,26 @@ def test_inversion_prefers_lower_rung():
     assert s.inversions()
     assert s.best() == 3
     assert s.next_rung() is None
+
+
+def test_phases_native_first_then_fallback_only():
+    from gopt.search import build_phases
+    ad = Adapter.load("warframe")
+    ups = ad.setting("upscaling")
+    phases = build_phases(ad.settings)
+    assert [p["name"] for p in phases] == ["native", "DLSS Quality"]
+    assert {r["upscaling"] for r in phases[0]["ladder"]} == {ups.top}
+    assert {r["upscaling"] for r in phases[1]["ladder"]} == {ups.levels.index("DLSS_QUALITY")}
+    assert len(build_phases(ad.settings, no_upscaling=True)) == 1
+    pinned = build_phases(ad.settings, pins={"upscaling": 0})
+    assert len(pinned) == 1 and {r["upscaling"] for r in pinned[0]["ladder"]} == {0}
+
+
+def test_unreachable_goal_measures_the_bottom_rung_second():
+    ad = Adapter.load("warframe")
+    from gopt.search import build_phases
+    ladder = build_phases(ad.settings)[0]["ladder"]
+    s = Search(ad, ladder, goal_fps=500.0, start_idx=len(ladder) - 2, max_runs=6)
+    first = s.next_rung()
+    s.record(first, fake_metrics(60.0))
+    assert s.next_rung() == 0

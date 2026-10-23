@@ -310,6 +310,39 @@ class Steam:
         return False
 
 
+def proton_major(name: str | None) -> int | None:
+    """Major Proton version from a tool name or version file: proton_9 -> 9, GE-Proton10-25 -> 10,
+    proton-10.0-3 -> 10; Experimental counts as current (99). None when unknown."""
+    if not name:
+        return None
+    if "experimental" in name.lower() or "hotfix" in name.lower():
+        return 99
+    m = re.search(r"(\d+)", name)
+    return int(m.group(1)) if m else None
+
+
+def dlss_note(tool: str | None) -> str:
+    """What Proton needs for DLSS on the NVIDIA proprietary driver (ADAPTERS-RESEARCH.md 1.7)."""
+    major = proton_major(tool)
+    if major is None:
+        return ("DLSS: Proton 9 or newer enables DXVK-NVAPI by default and copies nvngx.dll into the prefix; "
+                "the Proton version in use is unknown, check Steam > Properties > Compatibility")
+    if major < 9:
+        return f"DLSS: {tool} is older than Proton 9; add PROTON_ENABLE_NVAPI=1 to the launch options or pick Proton 9+"
+    return f"DLSS: {tool} enables DXVK-NVAPI by default; nothing to add to the launch options"
+
+
+def strip_forbidden(options: str, forbid: list[str]) -> tuple[str, list[str]]:
+    """Remove whitespace separated tokens that start with a forbidden string. Returns (options, removed)."""
+    kept, removed = [], []
+    for tok in options.split():
+        if tok != "%command%" and any(tok.startswith(f) or tok.split("=", 1)[0] == f for f in forbid):
+            removed.append(tok)
+        else:
+            kept.append(tok)
+    return " ".join(kept), removed
+
+
 def rewrite_launch_options(current: str | None, remove_patterns: list[str], ensure_prefix: str | None,
                            ensure_args: list[str] | None = None) -> str:
     """Build the replacement launch option string.

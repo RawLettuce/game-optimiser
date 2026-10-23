@@ -54,6 +54,40 @@ def build_ladder(settings: list[Setting], pins: dict[str, int] | None = None,
     return ladder
 
 
+def build_phases(settings: list[Setting], pins: dict[str, int] | None = None, no_upscaling: bool = False,
+                 vram_cap_mb: float | None = None) -> list[dict]:
+    """Native first (Matthew's rule, 23 Oct 2026): the upscaler is pinned Off for the first ladder; a
+    second ladder with the upscaler pinned at its `fallback` level (DLSS Quality) is only searched when
+    no native rung reaches the goal. Without an unpinned upscaler with a fallback there is one phase."""
+    pins = dict(pins or {})
+    ups = [s for s in settings if s.upscaling and s.id not in pins]
+    if no_upscaling or not ups or not all(s.fallback for s in ups):
+        return [{"name": "native" if no_upscaling else "all settings",
+                 "ladder": build_ladder(settings, pins, no_upscaling, vram_cap_mb)}]
+    native = dict(pins, **{s.id: s.top for s in ups})
+    fb = dict(pins)
+    names = []
+    for s in ups:
+        lv = s.level_of(s.fallback)
+        if lv is None:
+            raise ValueError(f"{s.id}: fallback {s.fallback!r} is not one of its levels")
+        fb[s.id] = lv
+        names.append(s.labels[lv])
+    return [{"name": "native", "ladder": build_ladder(settings, native, False, vram_cap_mb)},
+            {"name": " + ".join(names), "ladder": build_ladder(settings, fb, False, vram_cap_mb)}]
+
+
+def predicted_start(model, ladder: list[Rung], target_fps: float) -> int:
+    """Highest rung the model predicts at or above the target, else the lowest rung."""
+    if model is None or model.scale is None:
+        return 0
+    for idx in range(len(ladder) - 1, -1, -1):
+        fps = model.predict_fps(ladder[idx])
+        if fps is not None and fps >= target_fps:
+            return idx
+    return 0
+
+
 def describe_rung(adapter: Adapter, rung: Rung) -> str:
     parts = []
     for s in adapter.settings:
@@ -105,7 +139,8 @@ class Search:
     def __post_init__(self):
         if self.headroom is None:
             self.headroom = self.adapter.headroom
-        self.model = CostModel(self.adapter.settings, dict(self.ladder[self.start_idx]))
+        if self.model is None:          # a later phase passes the earlier phase's calibrated model
+            self.model = CostModel(self.adapter.settings, dict(self.ladder[self.start_idx]))
 
     # ---- state helpers ------------------------------------------------
     @property
@@ -203,6 +238,10 @@ class Search:
                 cand = idx
                 break
         if cand is None:
+            if lo < 0 and self.model is not None and self.model.scale is not None:
+                # nothing is predicted to pass: measure the bottom rung now, so an unreachable goal costs one
+                # run instead of a bisection (and the next phase, e.g. DLSS Quality, gets the budget)
+                return 0
             cand = (lo + hi) // 2
         # the model can be wrong at first: keep every probe inside the middle half of the open bracket so the
         # bracket shrinks by at least a quarter per run, like bisection, while a good model still steers it

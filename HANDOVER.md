@@ -7,6 +7,11 @@
 4. Many EE.cfg key names and the CS2 numeric level meanings are still unverified ([U]); `gopt discover` learns them on the PC by diffing the file after one in game change. Run it before the first real tune.
 5. Commands for the PC are below; items that need Matthew, his PC or a decision are listed at the end.
 
+## Session 2 (23 Oct 2026 evening, branch claude/game-optimiser-fixes-2827ib, in progress)
+- Done: the four bugs from the first PC run (library listed twice, CS2 shown as Proton, probe display nulls, DRM mode duplicates), each with a regression test built from the PC's real output.
+- Done: native first search with DLSS Quality only as a fallback; DLSS needs nothing extra on Proton 9+; Warframe advice is native borderless without Gamescope plus a KWin rule pinning `steam_app_230410` to DP-2; three Captura scenes offered on the first run.
+- Next: five new adapters (Borderlands 3, Garry's Mod, Brotato, Bloons TD 6, Risk of Rain Returns), then the pull request.
+
 ## Goal
 Tune a Steam game's settings to an fps goal by editing config files and Steam launch options only, measuring MangoHud logs, with few play runs. Safety: dry run default, backups with sha256, census, stale plan refusal, one undo per run, game and Steam closed checks, no sudo.
 

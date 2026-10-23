@@ -38,6 +38,7 @@ class Setting:
     upscaling: bool = False
     status: str = "U"
     vram_mb: list[int] | None = None
+    fallback: str | None = None      # upscaling only: the level tried when native cannot reach the goal
 
     @property
     def top(self) -> int:
@@ -79,6 +80,7 @@ class Adapter:
     launch_prefix: str | None
     launch_args: list[str]
     launch_forbid: list[str]
+    launch_advice: list[str]
     overrides: list[Override]
     settings: list[Setting]
     benchmark: dict
@@ -103,7 +105,7 @@ class Adapter:
                  settings_path_template=fs["path"], settings_format=fs["format"], keyroot=fs.get("keyroot"),
                  launch_remove=list(lo.get("remove_patterns", [])), launch_prefix=lo.get("ensure_prefix"),
                  launch_args=list(lo.get("ensure_args", [])), launch_forbid=list(lo.get("forbid", [])),
-                 overrides=overrides, settings=settings, benchmark=d.get("benchmark", {}), source=str(path))
+                 launch_advice=list(lo.get("advice", [])), overrides=overrides, settings=settings, benchmark=d.get("benchmark", {}), source=str(path))
         learned_path = path.with_suffix(".learned.json")
         if learned_path.exists():
             try:
