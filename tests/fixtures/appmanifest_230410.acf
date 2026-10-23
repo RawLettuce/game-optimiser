@@ -1,0 +1,40 @@
+"AppState"
+{
+	"appid"		"230410"
+	"Universe"		"1"
+	"LauncherPath"		"/var/home/mpaylor/.local/share/Steam/ubuntu12_32/steam"
+	"name"		"Warframe"
+	"StateFlags"		"4"
+	"installdir"		"Warframe"
+	"LastUpdated"		"1761100000"
+	"LastPlayed"		"1761200000"
+	"SizeOnDisk"		"50000000000"
+	"StagingSize"		"0"
+	"buildid"		"20000000"
+	"LastOwner"		"76561198012345678"
+	"UpdateResult"		"0"
+	"BytesToDownload"		"0"
+	"BytesDownloaded"		"0"
+	"BytesToStage"		"0"
+	"BytesStaged"		"0"
+	"TargetBuildID"		"20000000"
+	"AutoUpdateBehavior"		"0"
+	"AllowOtherDownloadsWhileRunning"		"0"
+	"ScheduledAutoUpdate"		"0"
+	"InstalledDepots"
+	{
+		"230411"
+		{
+			"manifest"		"1111111111111111111"
+			"size"		"50000000000"
+		}
+	}
+	"UserConfig"
+	{
+		"language"		"english"
+	}
+	"MountedConfig"
+	{
+		"language"		"english"
+	}
+}

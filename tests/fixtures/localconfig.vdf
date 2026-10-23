@@ -1,0 +1,40 @@
+"UserLocalConfigStore"
+{
+	"friends"
+	{
+		"PersonaName"		"tenno"
+	}
+	"Software"
+	{
+		"Valve"
+		{
+			"Steam"
+			{
+				"apps"
+				{
+					"230410"
+					{
+						"LastPlayed"		"1761200000"
+						"LaunchOptions"		"gamescope -W 3840 -H 2160 -r 240 -f -- %command%"
+						"cloud"
+						{
+							"last_sync_state"		"synchronized"
+						}
+					}
+					"730"
+					{
+						"LastPlayed"		"1761100000"
+						"cloud"
+						{
+							"last_sync_state"		"synchronized"
+						}
+					}
+				}
+			}
+		}
+	}
+	"system"
+	{
+		"EnableGameOverlay"		"1"
+	}
+}
