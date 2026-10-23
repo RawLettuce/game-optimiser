@@ -28,15 +28,16 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def read_text_or_refuse(path: Path) -> str:
-    """Read a config file; any problem is a hard stop, never an empty default."""
+def read_text_or_refuse(path: Path, errors: str = "strict") -> str:
+    """Read a config file; any problem is a hard stop, never an empty default. errors="surrogateescape"
+    keeps stray non UTF-8 bytes (binary blobs in localconfig.vdf) so they are written back byte for byte."""
     path = Path(path)
     if not path.exists():
         raise Refusal(f"missing file: {path}")
     if not os.access(path, os.R_OK):
         raise Refusal(f"unreadable file (permissions): {path}")
     try:
-        with open(path, "r", encoding="utf-8", newline="") as f:
+        with open(path, "r", encoding="utf-8", errors=errors, newline="") as f:
             data = f.read()
     except (OSError, UnicodeDecodeError) as e:
         raise Refusal(f"unreadable file: {path}: {e}")
@@ -191,7 +192,7 @@ def write_file(run: RunDir, path: Path, new_text: str, reason: str,
         raise Refusal(f"refusing to write outside the allowed roots: {path}")
     if not new_text.strip():
         raise Refusal(f"refusing to write an empty file: {path}")
-    data = new_text.encode("utf-8")
+    data = new_text.encode("utf-8", errors="surrogateescape")   # bytes kept by read_text_or_refuse go back unchanged
     before_count, before_bytes = census(census_paths or [path])
     if path.exists():
         run.backup(path, reason)

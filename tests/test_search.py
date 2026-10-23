@@ -225,7 +225,7 @@ def test_phases_native_first_then_fallback_only():
     phases = build_phases(ad.settings)
     assert [p["name"] for p in phases] == ["native", "DLSS Quality"]
     assert {r["upscaling"] for r in phases[0]["ladder"]} == {ups.top}
-    assert {r["upscaling"] for r in phases[1]["ladder"]} == {ups.levels.index("DLSS_QUALITY")}
+    assert {r["upscaling"] for r in phases[1]["ladder"]} == {ups.levels.index("UM_DLSS")}
     assert len(build_phases(ad.settings, no_upscaling=True)) == 1
     pinned = build_phases(ad.settings, pins={"upscaling": 0})
     assert len(pinned) == 1 and {r["upscaling"] for r in pinned[0]["ladder"]} == {0}

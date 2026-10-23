@@ -221,6 +221,19 @@ class Steam:
                 return None
         return None
 
+    def compat_tools(self) -> dict[str, list[str]]:
+        """Installed Proton builds: Valve's under steamapps/common ("Proton - Experimental", "Proton 9.0")
+        and custom ones (GE-Proton) under compatibilitytools.d. On the PC, 23 Oct 2026: Valve's
+        Experimental and the EasyAntiCheat runtime only, compatibilitytools.d empty."""
+        valve: list[str] = []
+        for lib in self.libraries():
+            common = lib / "steamapps" / "common"
+            if common.is_dir():
+                valve += sorted(d.name for d in common.iterdir() if d.is_dir() and d.name.lower().startswith("proton"))
+        ctd = self.root / "compatibilitytools.d"
+        custom = sorted(d.name for d in ctd.iterdir() if d.is_dir()) if ctd.is_dir() else []
+        return {"valve": valve, "custom": custom}
+
     # ---- user -----------------------------------------------------------
     def user_id(self) -> int:
         lu = self.root / "config" / "loginusers.vdf"
@@ -258,13 +271,16 @@ class Steam:
         return self.userdata() / "config" / "localconfig.vdf"
 
     # ---- launch options -------------------------------------------------
+    def _localconfig_text(self) -> str:
+        return read_text_or_refuse(self.localconfig_path(), errors="surrogateescape")
+
     def get_launch_options(self, appid: int) -> str | None:
-        kv = KeyValues(read_text_or_refuse(self.localconfig_path()))
+        kv = KeyValues(self._localconfig_text())
         return kv.get(LAUNCH_OPTIONS_PATH + [str(appid), "LaunchOptions"])
 
     def launch_options_text(self, appid: int, new_value: str) -> tuple[str, str]:
         """(old_text, new_text) for localconfig.vdf with the app's LaunchOptions set."""
-        text = read_text_or_refuse(self.localconfig_path())
+        text = self._localconfig_text()
         kv = KeyValues(text)
         if kv.find(LAUNCH_OPTIONS_PATH + [str(appid)]) is None:
             raise Refusal(f"app {appid} has no block in localconfig.vdf; start the game once from Steam first")

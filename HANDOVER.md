@@ -1,87 +1,74 @@
-# HANDOVER (game-optimiser), 23 Oct 2026, evening
+# HANDOVER (game-optimiser), 23 Oct 2026, late evening
 
 ## Summary (5 lines)
-1. The four bugs from the first PC run are fixed, each with a regression test built from the PC's real output: the library listed every game twice, CS2 showed as Proton, the probe printed "DP-2: None", and the DRM mode lists repeated (and the LG's 4K entries looked native).
-2. The search is now native first; DLSS Quality (FSR Quality for CS2) is only tried when no native rung reaches the goal. Proton 9+ needs nothing extra for DLSS. Warframe advice is native borderless without Gamescope plus a KWin rule pinning it to DP-2. The first Warframe run offers three Captura scenes.
-3. Five more adapters: Borderlands 3, Garry's Mod, Brotato, Bloons TD 6, Risk of Rain Returns. Only Garry's Mod tunes straight away. The others measure until their settings are confirmed on the PC with the new read only `find-settings` and `discover`.
-4. 127 passed, 1 skipped in the cloud (Python 3.13); `selftest` 20 checks. Nothing has touched the PC since the first read only run.
-5. Commands for the PC are below; items that need Matthew, his PC or a decision are listed at the end.
+1. Matthew's read only PC checks (23 Oct 2026, about 21:15) answered six open items; each answer is now in the code with a regression test (tests/test_pc_answers.py).
+2. Warframe adapter: upscaling is `Graphics.UpscaleMethod` plus companion `Graphics.UpscaleQuality` (UM_DLSS + UQ_QUALITY = DLSS Quality); `Graphics.Upscaling` is gone. EE.cfg is already MODE_BORDERLESS at 3840x2160 with DLSS Quality. Every key not in the file waits for `discover`, so Warframe is measure only until then.
+3. localconfig.vdf: path lookups only descend into blocks, so the plain "230410" string before apps/230410 is skipped; the file is read with surrogateescape so binary bytes are written back byte for byte.
+4. `kscreen-doctor -j` is the probe's first call (it was already; now pinned by a test); the LG's "max" is its fastest native mode and the HDMI 4K modes are listed as scaler modes. Proton Experimental 11 and the absence of GE-Proton are recorded and printed by `show` and `games`.
+5. 147 passed, 1 skipped in the cloud (Python 3.13); `selftest` 20 checks. Nothing has touched the PC since the read only checks.
 
 ## Goal
 Tune a Steam game's settings to an fps goal by editing config files and Steam launch options only, measuring MangoHud logs, with few play runs. Safety: dry run default, backups with sha256, whole file check after every write, census, stale plan refusal, one undo per run, game and Steam closed checks, no sudo.
 
 ## Current state
-- Branch `claude/game-optimiser-fixes-2827ib` (from `claude/design-brief-9l3xau`), pull request into `main`.
+- Branch `claude/game-optimiser-fixes-2827ib`, pull request #1 into `main`.
 - Code: `gopt/` (parsers eecfg, keyvalues, srccfg, jsontext, winreg; safety, steam, hwprobe, findsettings, mangohud, metrics, model, search, adapters, session, cli). Data: seven TOML files in `data/adapters/`.
-- What changed this session and why: DESIGN.md (5, 6, 7.3a, 8.2a, 9, 10, 13) and ADAPTERS-RESEARCH.md (1.5a, 1.7, sections 3 to 7, sources S60 to S81 and P44 to P51).
+- New this session: `Setting.extra_keys` (companion keys per level), `Adapter.needs_discover` (absent keys wait for discover), discover handles companion keys, asks "did the menu already show it?" when nothing changed and retries missing levels once, `Steam.compat_tools()`, `KeyValues.find` prefers blocks, `read_text_or_refuse(errors=...)`, probe `max_mode` at the native size plus `scaler_modes`.
 
-## Exact commands for the PC (Konsole on the host, no sudo anywhere)
+## PC answers, 23 Oct 2026 (read only)
+| Open item | Answer | Where it went |
+|---|---|---|
+| Which Proton, GE-Proton? | Proton Experimental (prefix 11.0-100, build experimental-11.0-20261014), no CompatToolMapping, compatibilitytools.d empty: GE-Proton not installed | ADAPTERS-RESEARCH 1.6, 1.7; DESIGN 10 (E3); `show`/`games` print it |
+| localconfig.vdf layout | Top key `UserLocalConfigStore`; LaunchOptions at Software/Valve/Steam/apps/230410 (line 587); a plain "230410" string earlier (line 373) | DESIGN 6 and 7.4; parser fix |
+| `kscreen-doctor --json` | `-j` and `--json` work; keys features, outputs, screen, tabletModeAvailable, tabletModeEngaged; DP-2 mode 34 3840x2160@240 scale 1.5; HDMI-A-1 mode 7 2560x1440@144 scale 1 | DESIGN 5 (already [V]); test |
+| EE.cfg keys | Ten Graphics keys only; UpscaleMethod/UpscaleQuality, WindowMode=MODE_BORDERLESS, FullScreenSizeX/Y=3840/2160; no MaxFramerate, VSync or quality keys | warframe.toml; ADAPTERS-RESEARCH W1; DESIGN 7.1 |
+| CS2 console.log | Not present until a `-condebug` run; expected `<install>/game/csgo/console.log`; CS2 native | ADAPTERS-RESEARCH 2; DESIGN 9 |
+| Warframe process names | Warframe.x64.exe, Launcher.exe, RemoteCrashSender.exe exist in the install; live names not seen | ADAPTERS-RESEARCH 1.1 |
 
-Update the code (first time: clone; afterwards: pull):
+## Still open (needs Matthew, his PC or a decision)
+- The value Warframe writes for Upscaling Off (UM_NONE is a guess): `discover warframe` records it. Until then upscaling is not tuned.
+- Every other Warframe Graphics key (Geometry, Shadow, Texture, GPU Particles, AA, AO, Volumetric, Reflections, Dynamic Lighting, DoF, Bloom) and the Max Framerate and VSync keys: absent from EE.cfg until changed in game; `discover warframe`.
+- Live process names under `ps` while Warframe and CS2 run.
+- CS2 `console.log` path: run CS2 once with `-condebug`.
+- Which Captura scene he owns and prefers (asked on the first measure or tune).
+- Whether Warframe offers DLSS under DirectX 11 or only DirectX 12 (it is on now; which API the launcher uses is unknown).
+- KWin rule window class (`steam_app_230410` is from a secondary source): Detect Window Properties.
+- E3 (Wine Wayland driver) needs GE-Proton installed, or a check whether Proton Experimental 11 exposes the Wayland driver [U]. Decision for Matthew, only if borderless loses focus.
+- Garry's Mod native or Proton; Brotato Steam Cloud off before any write; CS2, Borderlands 3, Brotato, Bloons TD 6, Risk of Rain Returns discover and find-settings as before.
+- No sudo step exists; `scripts/root-steps.sh` was not created because nothing needs root.
+
+## First real run on the PC (Konsole on the host, no sudo)
+1. Update the code and check it:
 ```
 cd ~/Documents/game-optimiser
 git fetch origin
 git checkout claude/game-optimiser-fixes-2827ib
 git pull
 python3 -m gopt selftest
+python3 -m gopt show warframe
 ```
-
-Re-check the four fixed bugs (read only):
+   Expect: Upscaling `UM_DLSS` / `DLSS Quality` with `UQ_QUALITY`; the other settings "not in the file: not tuned until discover"; "Proton prefix version: 11.0-100"; "GE-Proton is not installed".
+2. Discover (reads EE.cfg, writes only `data/adapters/warframe.learned.json`):
 ```
-python3 -m gopt library --games-only
-python3 -m gopt probe | tail -6
-python3 -m gopt games
-```
-Expected: each game once; CS2 `native`; "gaming display DP-2: 3840x2160@240 (native 3840x2160@60) scale 1.5 HDR on [from kscreen-doctor -j]"; the LG line names the monitor from its EDID and lists 3840x2160 under "also accepts ... (scaler, not native)".
-
-DLSS check (read only):
-```
-ls /usr/lib64/nvidia/wine/
-ls "$HOME/.local/share/Steam/steamapps/compatdata/230410/pfx/drive_c/windows/system32/" | grep -i nvngx
-```
-
-Warframe launch options and display (manual, once): paste the printed launch option (`mangohud %command%`, Gamescope gone); in game Display Mode = Borderless Fullscreen at 3840x2160; add the KWin rule that `python3 -m gopt show warframe` prints (Window Rules, class `steam_app_230410`, Screen Force = AGON).
-
-Learn keys and settings files (one in game change each time, quit, press Enter):
-```
-python3 -m gopt discover cs2
 python3 -m gopt discover warframe
-python3 -m gopt discover borderlands3
-python3 -m gopt find-settings riskofrainreturns
-python3 -m gopt find-settings brotato
-python3 -m gopt find-settings bloonstd6
 ```
-`find-settings` saves its result under `~/.local/share/game-optimiser/find-settings/`; commit nothing from there, paste the text back.
-
-Tuning (dry run first, then apply):
+   For each prompt: change that one option in game, quit Warframe fully, press Enter. Upscaling first: for "DLSS Quality" change nothing, press Enter, answer `y`; for "Off (native)" set Upscaling Off. `s` skips a setting, `q` stops (progress is saved per level, run it again to continue). Then paste: `cat data/adapters/warframe.learned.json`
+3. Launch options and window rule (manual, once): Steam > Warframe > Properties > Launch Options = `mangohud %command%` (Gamescope removed); add the KWin rule that `show warframe` prints.
+4. One measure run (writes only `~/.config/MangoHud/wine-Warframe.x64.conf` for the run, restored afterwards; no game file is touched):
 ```
-python3 -m gopt tune cs2 --goal 3840x2160@240
-python3 -m gopt tune cs2 --goal 3840x2160@240 --apply
-python3 -m gopt tune warframe --goal 3840x2160@90 --apply        # asks which Captura scene, once
-python3 -m gopt tune garrysmod --goal 3840x2160@240 --apply
-python3 -m gopt report <run-id>
-python3 -m gopt undo <run-id>
+python3 -m gopt measure warframe
 ```
+   Pick the Captura scene, follow the printed steps (Shift+F2 starts the 60 s log), quit the game, press Enter. Paste the printed metrics.
 
 ## How to verify (cloud)
-`python3 -m pytest -q` from the repo root: 127 passed, 1 skipped (a permissions test that cannot run as root).
+`python3 -m pytest -q` from the repo root (pytest in a scratch venv; nothing installed on the host): 147 passed, 1 skipped (a permissions test that cannot run as root).
 
 ## Next steps (in order)
-1. On the PC: the re-check commands above, then `discover` and `find-settings`; record results in a dated `VERIFIED.md` and move facts from [U] to [V].
-2. Fill the Risk of Rain Returns and Brotato settings from `find-settings` (path, format, keys) and the Borderlands 3 keys from `discover` (they land in `borderlands3.learned.json` automatically).
-3. First tune of CS2, then Warframe (borderless, then E1b and E3 only if focus breaks), then Garry's Mod.
+1. On the PC: the four steps above; record results in a dated `VERIFIED.md` and move facts from [U] to [V].
+2. First Warframe tune once upscaling and the main quality keys are discovered: `python3 -m gopt tune warframe --goal 3840x2160@90` (dry run), then `--apply`.
+3. CS2: `discover cs2`, then tune; Garry's Mod tune; the find-settings games.
 4. Automate the headroom calibration (`measure --free-play` writing `learned.headroom`).
 5. Per setting learned costs from runs that differ in one setting.
-
-## Needs Matthew, his PC or a decision (skipped here)
-- Every [U] key, process name and file name in ADAPTERS-RESEARCH.md (tables W1, C1, B1, G1, sections 5 to 7).
-- Which of the three Captura scenes he owns and prefers (asked on the first run).
-- Whether Warframe offers DLSS under DirectX 11 or only DirectX 12 (look at Options > Display > Upscaling).
-- Confirm the KWin rule's window class with Detect Window Properties (`steam_app_230410` is from a secondary source).
-- Garry's Mod: confirm native or Proton (the new `library` says which) and the process name; whether to try `gmod_mcore_test 1` (advice only, community reports instability).
-- Brotato: turn Steam Cloud off before any write to save_v2.json (none happens until keys are confirmed).
-- localconfig.vdf top level key (only for `--write-launch-options`; the default is to paste).
-- No sudo step exists; `scripts/root-steps.sh` was not created because nothing needs root.
 
 ## more-adapters (23 Oct 2026, late; branch `claude/more-adapters-z901je`, based on PR #1's branch)
 
@@ -94,7 +81,7 @@ python3 -m gopt undo <run-id>
 6. Files of PR #1 touched: `gopt/cli.py` (two selftest lines), `tests/test_parsers.py` and `tests/test_new_adapters.py` (the same read change), `tests/test_adapters.py` (the adapter list check is now "the original seven are present"), ADAPTERS-RESEARCH.md (section 9, item 11 in section 8, sources), FIXTURES.md, this section. No parser, search, Warframe or CS2 code changed.
 
 ### State
-- 173 passed, 1 skipped on Python 3.13 and on 3.12 (the skipped test needs a non root user; it passes as `nobody`, 174/174). `selftest` 39 checks.
+- After merging PR #1's latest commit (83b7d5b, PC answers): 193 passed, 1 skipped on Python 3.13 and on 3.12 (the skipped test needs a non root user; it passes as `nobody`, 194/194). `selftest` 39 checks. CI green on GitHub Actions.
 - Confidence: tunes after `discover` (file known, keys guessed): Deep Rock Galactic, The Witcher 3, XCOM 2. Measure only with the file known: Disco Elysium, Dishonored. Measure only because the format (SJSON) is unsupported: Hades, Darktide, Vermintide 2. Needs `find-settings`: the other eleven.
 
 ### Exact commands for the PC (Konsole on the host, after PR #1's commands; all read only)

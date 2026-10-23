@@ -87,8 +87,8 @@ Restores every file the run touched from its backups. Each run can be undone onc
 
 | Level | Games | What works |
 |---|---|---|
-| Tunes now | Counter-Strike 2, Warframe, Garry's Mod | plan, tune, measure, undo |
-| Tunes after `discover` | Borderlands 3, Deep Rock Galactic, The Witcher 3, XCOM 2 | the settings file is known; the key names must be confirmed first; measure works now |
+| Tunes now | Counter-Strike 2, Garry's Mod | plan, tune, measure, undo |
+| Tunes after `discover` | Warframe (keys absent from EE.cfg until changed in game), Borderlands 3, Deep Rock Galactic, The Witcher 3, XCOM 2 | the settings file is known; the key names must be confirmed first; measure works now |
 | Measure only, file known | Brotato, Bloons TD 6, Disco Elysium, Dishonored | `show` reads the file; nothing is written |
 | Measure only, format not supported yet | Hades, Darktide, Vermintide 2 | measure |
 | Needs `find-settings` | Risk of Rain Returns, LEGO The Lord of the Rings, Detroit, Hotline Miami, Lethal Company, Megabonk, Monster Hunter Stories 2, Risk of Rain 2, Slime Rancher, Tactical Breach Wizards, Terraria, Mechanicus | measure |

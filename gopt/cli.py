@@ -54,7 +54,8 @@ def cmd_probe(args, paths: Paths, out) -> int:
     drm = {d["connector"]: d for d in disp.get("drm_connected", [])}
     for o in disp.get("outputs", []):
         d = drm.get(o.get("name"), {})
-        extra = f", also accepts {', '.join(d['above_preferred'])} (scaler, not native)" if d.get("above_preferred") else ""
+        scaler = d.get("above_preferred") or o.get("scaler_modes")
+        extra = f", also accepts {', '.join(scaler)} (scaler, not native)" if scaler else ""
         out(f"output {o.get('name')}{' (' + d['monitor'] + ')' if d.get('monitor') else ''}: "
             f"{o.get('active_mode') or 'mode unknown'}, native {o.get('preferred_mode') or '?'}, "
             f"max {o.get('max_mode') or '?'}, scale {o.get('scale')}, priority {o.get('priority')}{extra}")
@@ -113,7 +114,14 @@ def cmd_games(args, paths: Paths, out) -> int:
         out(f"  settings: {sp} {'(found)' if exists else '(MISSING: run the game once)'}")
         out(f"  launch options: {steam.get_launch_options(ad.appid) or '(none)'}")
         out(f"  running: {', '.join(running) if running else 'no'}")
+    out(_proton_line(steam))
     return 0
+
+
+def _proton_line(steam: Steam) -> str:
+    tools = steam.compat_tools()
+    return (f"Proton builds: {', '.join(tools['valve']) or 'none'}; custom (compatibilitytools.d): "
+            f"{', '.join(tools['custom']) or 'none, so GE-Proton is not installed (experiment E3 needs it)'}")
 
 
 def cmd_show(args, paths: Paths, out) -> int:
@@ -136,12 +144,20 @@ def cmd_show(args, paths: Paths, out) -> int:
     out(f"{'setting':28} {'key':40} {'value':16} level            status")
     for s in ad.settings:
         v = vals.get(s.key)
-        lv = s.level_of(v)
+        lv = s.level_from(vals)
         label = s.labels[lv] if lv is not None else ("absent (default)" if v is None else "unrecognised")
-        out(f"{s.label:28} {s.key:40} {str(v):16} {label:16} {s.status}{' (guessed key: not tuned until discover)' if not s.usable else ''}")
+        wait = ""
+        if ad.needs_discover(s, vals, sp):
+            wait = " (guessed key or value: not tuned until discover)" if not s.usable else " (not in the file: not tuned until discover)"
+        out(f"{s.label:28} {s.key:40} {str(v):16} {label:16} {s.status}{wait}")
+        for k in s.extra_keys:
+            out(f"{'  with':28} {k:40} {str(vals.get(k)):16}")
     for o in ad.overrides:
         out(f"{'[override] ' + o.key:69} {str(vals.get(o.key)):16} wanted {o.value:9} {o.status}")
     out(f"launch options: {steam.get_launch_options(ad.appid) or '(none)'}")
+    if ad.runtime == "proton":
+        out(f"Proton prefix version: {steam.proton_version(ad.appid) or 'unknown'}")
+        out(_proton_line(steam))
     for a in ad.launch_advice:
         out(f"advice: {a}")
     runs = sorted(p.name for p in paths.runs.glob(f"*-{ad.id}")) if paths.runs.exists() else []
@@ -219,7 +235,7 @@ def cmd_report(args, paths: Paths, out) -> int:
     return 0
 
 
-def cmd_discover(args, paths: Paths, out) -> int:
+def cmd_discover(args, paths: Paths, out, ask=input) -> int:
     steam = _steam(paths)
     ad = Adapter.load(args.game)
     sess = Session(ad, steam, paths, out=out)
@@ -239,26 +255,48 @@ def cmd_discover(args, paths: Paths, out) -> int:
     for s in ad.settings:
         if s.status == "V":
             continue
-        for label in s.labels:
-            before = sess.snapshot()
-            ans = input(f"Set '{s.label}' to '{label}' in game, quit, then press Enter (s to skip this setting, q to quit): ")
-            if ans.strip().lower() == "q":
-                return 0
-            if ans.strip().lower() == "s":
+        # two passes: a level the menu already showed gives no change the first time; it is asked again at the end
+        skip = False
+        for attempt in (1, 2):
+            missing = [l for l in s.labels if l not in ad.learned.get("discover", {}).get(s.id, {}).get("values", {})]
+            if skip or not missing or (attempt == 2 and missing == s.labels):
                 break
-            after = sess.snapshot()
-            diff = Session.discover_diff(before, after)
-            if not diff:
-                out("  no key changed (already at that value, or the game did not write the file); skipping this level")
-                continue
-            try:
-                sess.record_discovery(s.id, label, diff)
-                k = next(iter(diff))
-                out(f"  {s.label} / {label} -> {k} = {diff[k][1]}")
-            except Refusal as e:
-                out(f"  {e}")
+            if attempt == 2:
+                out(f"  {s.label}: once more for {', '.join(missing)}")
+            for label in missing:
+                r = _discover_one(sess, s, label, ask, out)
+                if r == "q":
+                    out(f"saved to {ad.learned_path()}")
+                    return 0
+                if r == "s":
+                    skip = True
+                    break
     out(f"saved to {ad.learned_path()}")
     return 0
+
+
+def _discover_one(sess: Session, s, label: str, ask, out) -> str:
+    """One in game change for discover: 'ok', 'skip level', 's' (skip setting) or 'q' (quit)."""
+    before = sess.snapshot()
+    ans = ask(f"Set '{s.label}' to '{label}' in game, quit, then press Enter (s to skip this setting, q to quit): ")
+    if ans.strip().lower() in ("q", "s"):
+        return ans.strip().lower()
+    after = sess.snapshot()
+    diff = Session.discover_diff(before, after)
+    if not diff:
+        cur = after.get(s.key)
+        if cur is not None and ask(f"  nothing changed. Did the menu already show '{label}'? y records "
+                                   f"{s.key}={cur} for it: ").strip().lower() == "y":
+            diff = {s.key: (cur, cur)}
+        else:
+            out("  no key changed (already at that value, or the game did not write the file); skipping this level")
+            return "skip level"
+    try:
+        sess.record_discovery(s.id, label, diff)
+        out(f"  {s.label} / {label} -> " + ", ".join(f"{k} = {v[1]}" for k, v in sorted(diff.items())))
+    except Refusal as e:
+        out(f"  {e}")
+    return "ok"
 
 
 def cmd_find_settings(args, paths: Paths, out) -> int:
