@@ -81,49 +81,170 @@ def gpu_info(smi_out: str | None = None, smi_q: str | None = None) -> dict:
     return info
 
 
+def _hz(r: float) -> float:
+    return round(float(r), 2)
+
+
+def _mode(w: int, h: int, r: float) -> str:
+    """'3840x2160@240' or '2560x1440@99.95': whole numbers lose the decimals."""
+    hz = _hz(r)
+    return f"{w}x{h}@{int(round(hz)) if abs(hz - round(hz)) < 0.02 else f'{hz:.2f}'}"
+
+
+def _new_output(oid, name) -> dict:
+    return {"id": oid, "name": name, "enabled": None, "connected": None, "priority": None, "scale": None,
+            "pos": None, "active_mode": None, "refresh_hz": None, "width": None, "height": None,
+            "preferred_mode": None, "max_mode": None, "modes": [], "hdr": None, "vrr": None}
+
+
+def _finish_modes(o: dict, modes: list[tuple[int, int, float]], current, preferred):
+    """Fill the mode fields from (w, h, hz) tuples: deduplicated, largest and fastest first."""
+    uniq = sorted(set((w, h, _hz(r)) for w, h, r in modes), key=lambda m: (m[0] * m[1], m[2]), reverse=True)
+    o["modes"] = [_mode(*m) for m in uniq]
+    o["max_mode"] = o["modes"][0] if o["modes"] else None
+    if current:
+        w, h, r = current
+        o.update(width=w, height=h, refresh_hz=_hz(r), active_mode=_mode(w, h, r))
+    if preferred:
+        o["preferred_mode"] = _mode(*preferred)
+
+
+MODE_RE = re.compile(r"(\d+):(\d+)x(\d+)@([\d.]+)(\*?)(!?)")
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def parse_kscreen(text: str) -> list[dict]:
-    """Parse `kscreen-doctor -o` plain output into outputs with the active mode."""
+    """Parse `kscreen-doctor -o` text (libkscreen doctor.cpp showOutputs).
+
+    Each output starts with 'Output: <id> <name> <uuid>' and is followed by one item per line.
+    Modes are printed as 'id:WxH@RR.RR', the current one with '*', the preferred one with '!'
+    (doctor.cpp prints the refresh with two decimals: '240.00*'). Terminal colour codes are removed.
+    Also accepts the older one line form.
+    """
     outputs = []
-    cur = None
-    ansi = re.compile(r"\x1b\[[0-9;]*m")
-    for raw in text.splitlines():
-        line = ansi.sub("", raw).strip()
-        m = re.match(r"Output:\s*(\d+)\s+(\S+)", line)
-        if m:
-            cur = {"id": int(m.group(1)), "name": m.group(2), "enabled": None, "scale": None,
-                   "active_mode": None, "refresh_hz": None, "width": None, "height": None, "hdr": None}
-            outputs.append(cur)
-            line = line[m.end():]      # the rest of the line may hold the other fields
-        if cur is None:
+    text = ANSI_RE.sub("", text)
+    for rec in re.split(r"(?m)(?=^\s*Output:)", text):
+        m = re.match(r"\s*Output:\s*(\d+)\s+(\S+)", rec)
+        if not m:
             continue
-        # kscreen-doctor prints one item per line in a terminal and everything on one line when piped,
-        # so every pattern is searched anywhere in the line.
-        if re.search(r"\benabled\b", line) and cur["enabled"] is None:
-            cur["enabled"] = True
-        if re.search(r"\bdisabled\b", line) and not re.search(r"HDR:\s*disabled|Gamut:\s*disabled", line) and cur["enabled"] is None:
-            cur["enabled"] = False
-        ms = re.search(r"Scale:\s*([0-9.]+)", line)
+        o = _new_output(int(m.group(1)), m.group(2))
+        body = rec[m.end():]
+        st = re.search(r"(?:^|\s)(enabled|disabled)\s+(connected|disconnected)\b", body)
+        if st:
+            o["enabled"], o["connected"] = st.group(1) == "enabled", st.group(2) == "connected"
+        mp = re.search(r"\bpriority\s+(\d+)", body)
+        if mp:
+            o["priority"] = int(mp.group(1))
+        ms = re.search(r"Scale:\s*([0-9.]+)", body)
         if ms:
-            cur["scale"] = float(ms.group(1))
-        mh = re.search(r"HDR:\s*(\w+)", line)
+            o["scale"] = float(ms.group(1))
+        mg = re.search(r"Geometry:\s*(-?\d+),(-?\d+)", body)
+        if mg:
+            o["pos"] = [int(mg.group(1)), int(mg.group(2))]
+        mh = re.search(r"HDR:\s*(\w+)", body)
         if mh:
-            cur["hdr"] = mh.group(1).lower() == "enabled"
-        m2 = re.search(r"(\d+)x(\d+)@(\d+)\*", line)
-        if m2 and ("Modes:" in line or cur["active_mode"] is None):
-            cur["width"], cur["height"], cur["refresh_hz"] = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
-            cur["active_mode"] = f"{m2.group(1)}x{m2.group(2)}@{m2.group(3)}"
+            o["hdr"] = mh.group(1).lower() == "enabled"
+        mv = re.search(r"Vrr:\s*(\w+)", body)
+        if mv:
+            o["vrr"] = mv.group(1)
+        modes, cur, pref = [], None, None
+        for _id, w, h, r, star, bang in MODE_RE.findall(body.split("Custom modes")[0]):
+            t = (int(w), int(h), float(r))
+            modes.append(t)
+            if star:
+                cur = t
+            if bang:
+                pref = t
+        _finish_modes(o, modes, cur, pref)
+        outputs.append(o)
     return outputs
 
 
-def display_info(kscreen_out: str | None = None) -> dict:
-    out = kscreen_out if kscreen_out is not None else _run(["kscreen-doctor", "-o"])
-    outputs = parse_kscreen(out) if out else []
-    drm = []
-    for p in sorted(Path("/sys/class/drm").glob("card*-*")) if Path("/sys/class/drm").exists() else []:
+def parse_kscreen_json(text: str) -> list[dict] | None:
+    """Parse `kscreen-doctor -j` (libkscreen ConfigSerializer). None when it is not that JSON."""
+    try:
+        doc = json.loads(text)
+        raw = doc["outputs"]
+        if not isinstance(raw, list):
+            return None
+        outputs = []
+        for r in raw:
+            o = _new_output(r.get("id"), r.get("name"))
+            o.update(enabled=r.get("enabled"), connected=r.get("connected"), priority=r.get("priority"),
+                     scale=float(r["scale"]) if r.get("scale") is not None else None,
+                     hdr=r.get("hdr", False if "hdr" not in r else None), vrr=r.get("vrrPolicy"))
+            if isinstance(r.get("pos"), dict):
+                o["pos"] = [r["pos"].get("x"), r["pos"].get("y")]
+            by_id, modes = {}, []
+            for md in r.get("modes", []):
+                t = (int(md["size"]["width"]), int(md["size"]["height"]), float(md["refreshRate"]))
+                by_id[str(md["id"])] = t
+                modes.append(t)
+            prefs = [str(x) for x in r.get("preferredModes", [])]
+            _finish_modes(o, modes, by_id.get(str(r.get("currentModeId"))),
+                          by_id.get(prefs[0]) if prefs else None)
+            outputs.append(o)
+        return outputs
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def edid_name(edid: bytes) -> str | None:
+    """Monitor name from the EDID base block (display descriptor tag 0xFC)."""
+    if len(edid) < 128:
+        return None
+    for off in (54, 72, 90, 108):
+        d = edid[off:off + 18]
+        if d[0:3] == b"\0\0\0" and d[3] == 0xFC:
+            return d[5:18].split(b"\n", 1)[0].decode("ascii", "replace").strip() or None
+    return None
+
+
+def drm_connectors(root: Path = Path("/sys/class/drm")) -> list[dict]:
+    """Connected DRM connectors with their EDID monitor name and deduplicated mode sizes.
+
+    The kernel lists the preferred mode first and one line per timing, so sizes repeat. Sizes above
+    the preferred one are modes the monitor's scaler accepts (the LG 27GL850's EDID offers 3840x2160
+    over HDMI), not its native resolution.
+    """
+    out = []
+    if not Path(root).exists():
+        return out
+    for p in sorted(Path(root).glob("card*-*")):
         status = _read(str(p / "status"))
-        if status and status.strip() == "connected":
-            drm.append({"connector": p.name.split("-", 1)[1], "modes": (_read(str(p / "modes")) or "").split()[:3]})
-    return {"outputs": outputs, "drm_connected": drm,
+        if not status or status.strip() != "connected":
+            continue
+        sizes = []
+        for m in (_read(str(p / "modes")) or "").split():
+            if m not in sizes:
+                sizes.append(m)
+        pref = sizes[0] if sizes else None
+
+        def area(m):
+            mm = re.match(r"(\d+)x(\d+)", m)
+            return int(mm.group(1)) * int(mm.group(2)) if mm else 0
+        try:
+            edid = (p / "edid").read_bytes()
+        except OSError:
+            edid = b""
+        out.append({"connector": p.name.split("-", 1)[1], "monitor": edid_name(edid), "preferred": pref,
+                    "modes": sizes, "above_preferred": [m for m in sizes if pref and area(m) > area(pref)]})
+    return out
+
+
+def display_info(kscreen_json: str | None = None, kscreen_text: str | None = None,
+                 drm_root: Path = Path("/sys/class/drm")) -> dict:
+    """Outputs from `kscreen-doctor -j` (preferred) or `-o` (fallback), plus the DRM connectors."""
+    if kscreen_json is None and kscreen_text is None:
+        kscreen_json = _run(["kscreen-doctor", "-j"])
+    outputs, source = (parse_kscreen_json(kscreen_json) if kscreen_json else None), "kscreen-doctor -j"
+    if not outputs:
+        if kscreen_text is None:
+            kscreen_text = _run(["kscreen-doctor", "-o"])
+        outputs, source = (parse_kscreen(kscreen_text) if kscreen_text else []), "kscreen-doctor -o"
+        if not outputs:
+            source = None
+    return {"outputs": outputs, "source": source, "drm_connected": drm_connectors(drm_root),
             "session": os.environ.get("XDG_SESSION_TYPE"), "desktop": os.environ.get("XDG_CURRENT_DESKTOP")}
 
 

@@ -33,6 +33,9 @@ class InstalledApp:
     buildid: str
     proton: bool
     install_path: str
+    runtime: str = "unknown"          # native, proton, proton? (compatdata only) or unknown
+    runtime_source: str = ""
+    compat_tool: str | None = None
 
     def as_dict(self):
         return asdict(self)
@@ -49,7 +52,21 @@ class Steam:
 
     # ---- libraries and apps -------------------------------------------
     def libraries(self) -> list[Path]:
+        """Library folders, each listed once. Paths are compared by realpath: on Bazzite /home is a
+        symlink to /var/home, so the Steam root (/home/...) and libraryfolders.vdf (/var/home/...) name
+        the same folder (seen on the PC, 23 Oct 2026)."""
         libs: list[Path] = []
+        seen: set[str] = set()
+
+        def add(p: Path, first: bool = False):
+            real = os.path.realpath(p)
+            if real in seen:
+                return
+            seen.add(real)
+            libs.insert(0, p) if first else libs.append(p)
+
+        if (self.root / "steamapps").exists():
+            add(self.root, first=True)
         lf = self.root / "steamapps" / "libraryfolders.vdf"
         if lf.exists():
             kv = KeyValues(read_text_or_refuse(lf))
@@ -58,15 +75,89 @@ class Steam:
                 for child in top.children:
                     pnode = child.child("path")
                     if pnode is not None and pnode.value:
-                        p = Path(pnode.value)
-                        if p not in libs:
-                            libs.append(p)
-        if self.root not in libs and (self.root / "steamapps").exists():
-            libs.insert(0, self.root)
+                        add(Path(pnode.value))
         return libs
+
+    # ---- runtime: native Linux or Proton ------------------------------
+    def compat_tool_mapping(self) -> dict[str, str]:
+        """appid -> compatibility tool name from config/config.vdf CompatToolMapping (the per game
+        'Force the use of a specific Steam Play compatibility tool' choice; "0" is the global default,
+        which Steam applies only to games without a Linux build). Same lookup as protontricks [P]."""
+        cfg = self.root / "config" / "config.vdf"
+        if not cfg.exists():
+            return {}
+        try:
+            kv = KeyValues(read_text_or_refuse(cfg))
+        except Exception:
+            return {}
+        node = kv.find(["InstallConfigStore", "Software", "Valve", "Steam", "CompatToolMapping"])
+        out = {}
+        for c in (node.children if node is not None else []):
+            n = c.child("name")
+            if n is not None and n.value:
+                out[c.key] = n.value
+        return out
+
+    @staticmethod
+    def scan_binaries(install: Path, max_depth: int = 5, max_entries: int = 4000) -> tuple[str | None, str | None]:
+        """(first Linux ELF executable, first Windows .exe) under an install folder, bounded.
+        Shared libraries (.so) are ignored: Windows games ship Linux EasyAntiCheat libraries."""
+        elf = exe = None
+        seen = 0
+        stack = [(Path(install), 0)]
+        while stack and seen < max_entries:
+            d, depth = stack.pop()
+            try:
+                entries = sorted(os.scandir(d), key=lambda e: e.name)
+            except OSError:
+                continue
+            for e in entries:
+                seen += 1
+                if seen > max_entries:
+                    break
+                try:
+                    if e.is_dir(follow_symlinks=False):
+                        if depth + 1 < max_depth:
+                            stack.append((Path(e.path), depth + 1))
+                        continue
+                    if not e.is_file(follow_symlinks=False):
+                        continue
+                    low = e.name.lower()
+                    if low.endswith(".exe"):
+                        exe = exe or e.path
+                        continue
+                    if ".so" in low or not (e.stat(follow_symlinks=False).st_mode & 0o111):
+                        continue
+                    with open(e.path, "rb") as f:
+                        if f.read(4) == b"\x7fELF":
+                            return e.path, exe
+                except OSError:
+                    continue
+        return elf, exe
+
+    def detect_runtime(self, appid: int, install: Path, compatdata_exists: bool,
+                       mapping: dict[str, str] | None = None) -> tuple[str, str, str | None]:
+        """(runtime, why, compat tool). A compatdata folder alone is weak evidence: Steam leaves it
+        behind for native games too (CS2 showed 'proton' on the PC, 23 Oct 2026)."""
+        mapping = self.compat_tool_mapping() if mapping is None else mapping
+        tool = mapping.get(str(appid))
+        if tool:
+            if tool.lower().startswith("steamlinuxruntime"):
+                return "native", f"CompatToolMapping {tool}", tool
+            return "proton", f"CompatToolMapping {tool}", tool
+        elf, exe = self.scan_binaries(install) if install.is_dir() else (None, None)
+        if elf:
+            return "native", f"Linux ELF executable {Path(elf).relative_to(install)}", None
+        if exe:
+            return "proton", f"Windows .exe {Path(exe).relative_to(install)} and no Linux executable", mapping.get("0")
+        if compatdata_exists:
+            return "proton?", "only a compatdata folder (no executables found to check)", None
+        return "unknown", "no executables found and no compatdata", None
 
     def apps(self) -> list[InstalledApp]:
         out = []
+        seen: set[int] = set()
+        mapping = self.compat_tool_mapping()
         for lib in self.libraries():
             sa = lib / "steamapps"
             if not sa.is_dir():
@@ -84,13 +175,18 @@ class Steam:
                     appid = int(g("appid", "0"))
                 except ValueError:
                     continue
+                if appid in seen:
+                    continue
+                seen.add(appid)
                 installdir = g("installdir")
+                install = sa / "common" / installdir
+                runtime, why, tool = self.detect_runtime(appid, install, (sa / "compatdata" / str(appid)).is_dir(), mapping)
                 out.append(InstalledApp(
                     appid=appid, name=g("name", f"app {appid}"), installdir=installdir, library=str(lib),
                     size_bytes=int(g("SizeOnDisk", "0") or 0), last_played=int(g("LastPlayed", "0") or 0),
                     last_updated=int(g("LastUpdated", "0") or 0), buildid=g("buildid"),
-                    proton=(sa / "compatdata" / str(appid)).is_dir(),
-                    install_path=str(sa / "common" / installdir)))
+                    proton=runtime.startswith("proton"), install_path=str(install),
+                    runtime=runtime, runtime_source=why, compat_tool=tool))
         out.sort(key=lambda a: a.name.lower())
         return out
 

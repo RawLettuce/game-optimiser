@@ -50,9 +50,25 @@ def cmd_probe(args, paths: Paths, out) -> int:
     data, fp, refreshed = _probe(paths, args.refresh)
     out(json.dumps(data, indent=2))
     out(f"fingerprint {fp}: cache {'refreshed' if refreshed else 'unchanged'} ({paths.hardware_cache})")
-    o = active_output(data, _display_name(paths))
-    if o:
-        out(f"gaming display {o['name']}: {o['active_mode']} scale {o['scale']} HDR {o['hdr']}")
+    disp = data.get("display", {})
+    drm = {d["connector"]: d for d in disp.get("drm_connected", [])}
+    for o in disp.get("outputs", []):
+        d = drm.get(o.get("name"), {})
+        extra = f", also accepts {', '.join(d['above_preferred'])} (scaler, not native)" if d.get("above_preferred") else ""
+        out(f"output {o.get('name')}{' (' + d['monitor'] + ')' if d.get('monitor') else ''}: "
+            f"{o.get('active_mode') or 'mode unknown'}, native {o.get('preferred_mode') or '?'}, "
+            f"max {o.get('max_mode') or '?'}, scale {o.get('scale')}, priority {o.get('priority')}{extra}")
+    name = _display_name(paths)
+    o = active_output(data, name)
+    if o and o.get("active_mode"):
+        out(f"gaming display {o['name']}: {o['active_mode']} (native {o.get('preferred_mode') or '?'}) "
+            f"scale {o.get('scale')} HDR {'on' if o.get('hdr') else 'off'} [from {disp.get('source')}]")
+    elif o:
+        out(f"gaming display {name}: found but its active mode could not be read [from {disp.get('source')}]; "
+            f"pass --goal WxH@fps explicitly")
+    else:
+        out(f"gaming display {name}: not found among {[x['name'] for x in disp.get('outputs', [])]} "
+            f"(set display = \"...\" in {paths.config_file})")
     return 0
 
 
@@ -69,7 +85,7 @@ def cmd_library(args, paths: Paths, out) -> int:
         if args.games_only and (a.appid == 228980 or "Redistributables" in a.name or "Proton" in a.name
                                 or "Steam Linux Runtime" in a.name or "Steamworks" in a.name):
             continue
-        out(f"{a.appid:>8}  {'proton' if a.proton else 'native':7}  {fmt_size(a.size_bytes):>9}  {fmt_date(a.last_played):11}  "
+        out(f"{a.appid:>8}  {a.runtime:7}  {fmt_size(a.size_bytes):>9}  {fmt_date(a.last_played):11}  "
             f"{ids.get(a.appid, '-'):8}  {a.name}  [{a.library}]")
     out(f"\n{len(apps)} installed apps in {len(steam.libraries())} libraries. Adapters: {', '.join(sorted(adapters))}.")
     return 0
@@ -91,6 +107,8 @@ def cmd_games(args, paths: Paths, out) -> int:
             sp, exists = str(e), False
         running = Steam.any_running(ad.processes, procs)
         out(f"{ad.name} (app {ad.appid}, {ad.runtime}{', ' + (steam.proton_version(ad.appid) or 'proton version unknown') if ad.runtime == 'proton' else ''})")
+        out(f"  detected: {app.runtime} ({app.runtime_source})"
+            + ("" if app.runtime.rstrip("?") == ad.runtime else f"  WARNING: the adapter says {ad.runtime}"))
         out(f"  install:  {app.install_path}")
         out(f"  settings: {sp} {'(found)' if exists else '(MISSING: run the game once)'}")
         out(f"  launch options: {steam.get_launch_options(ad.appid) or '(none)'}")

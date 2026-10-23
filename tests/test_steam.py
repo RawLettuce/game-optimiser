@@ -88,3 +88,83 @@ def test_running_processes_reads_proc(tmp_path):
     (tmp_path / "self").mkdir()
     procs = Steam.running_processes(tmp_path)
     assert procs == [("cs2", "/x/linuxsteamrt64/cs2 -steam")]
+
+
+# ---- regressions from the first PC run, 23 Oct 2026 ----------------------------------------------
+
+import os
+import shutil as _sh
+
+from conftest import build_steam_root
+
+
+def test_symlinked_home_lists_each_library_once(tmp_path):
+    # Bazzite: /home is a symlink to /var/home; Steam writes the real path into libraryfolders.vdf
+    real = tmp_path / "var" / "home"
+    real.mkdir(parents=True)
+    (tmp_path / "home").symlink_to(real)
+    paths = build_steam_root(real)
+    lf = paths["root"] / "steamapps" / "libraryfolders.vdf"
+    lf.write_text(lf.read_text())                    # already holds the real (resolved) paths
+    via_link = tmp_path / "home" / "Steam"
+    s = Steam(via_link)
+    libs = s.libraries()
+    assert len(libs) == 2                            # root + games2, not root twice
+    assert len({os.path.realpath(p) for p in libs}) == 2
+    ids = [a.appid for a in s.apps()]
+    assert len(ids) == len(set(ids))
+
+
+def test_runtime_compat_mapping_beats_compatdata(steam):
+    root = steam["root"]
+    # CS2 is native but has a leftover compatdata folder; Warframe is mapped to Proton in config.vdf
+    (root / "steamapps" / "compatdata" / "730").mkdir(parents=True)
+    cs2 = root / "steamapps" / "common" / "Counter-Strike Global Offensive" / "game" / "bin" / "linuxsteamrt64" / "cs2"
+    cs2.write_bytes(b"\x7fELF\x02\x01\x01" + b"\0" * 64)
+    cs2.chmod(0o755)
+    (root / "config" / "config.vdf").write_text(
+        '"InstallConfigStore"\n{\n\t"Software"\n\t{\n\t\t"Valve"\n\t\t{\n\t\t\t"Steam"\n\t\t\t{\n'
+        '\t\t\t\t"CompatToolMapping"\n\t\t\t\t{\n'
+        '\t\t\t\t\t"0"\n\t\t\t\t\t{\n\t\t\t\t\t\t"name"\t\t"proton_experimental"\n\t\t\t\t\t}\n'
+        '\t\t\t\t\t"230410"\n\t\t\t\t\t{\n\t\t\t\t\t\t"name"\t\t"GE-Proton10-25"\n\t\t\t\t\t\t"config"\t\t""\n\t\t\t\t\t}\n'
+        '\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n')
+    # ELDEN RING: Windows build only (an .exe), never launched (no compatdata, no mapping)
+    er = steam["lib2"] / "steamapps" / "common" / "ELDEN RING" / "Game"
+    er.mkdir(parents=True)
+    (er / "eldenring.exe").write_bytes(b"MZ" + b"\0" * 64)
+    s = Steam(root)
+    assert s.app(730).runtime == "native" and s.app(730).proton is False
+    assert "ELF" in s.app(730).runtime_source
+    wf = s.app(230410)
+    assert wf.runtime == "proton" and wf.compat_tool == "GE-Proton10-25" and "CompatToolMapping" in wf.runtime_source
+    assert s.app(1245620).runtime == "proton" and ".exe" in s.app(1245620).runtime_source
+
+
+def test_runtime_ignores_linux_eac_library_in_a_windows_game(steam):
+    d = steam["lib2"] / "steamapps" / "common" / "ELDEN RING"
+    (d / "EasyAntiCheat").mkdir(parents=True)
+    so = d / "EasyAntiCheat" / "easyanticheat_x64.so"
+    so.write_bytes(b"\x7fELF" + b"\0" * 60)
+    so.chmod(0o755)
+    (d / "game.exe").write_bytes(b"MZ")
+    assert Steam(steam["root"]).app(1245620).runtime == "proton"
+
+
+def test_runtime_unknown_falls_back_to_compatdata_with_a_question_mark(steam):
+    # Warframe's install folder is empty in the fixture and there is no mapping: only compatdata says Proton
+    a = Steam(steam["root"]).app(230410)
+    assert a.runtime == "proton?" and "compatdata" in a.runtime_source
+
+
+def test_library_cli_prints_detected_runtime(steam, tmp_path, monkeypatch):
+    from gopt import cli
+    from gopt.paths import Paths
+    cs2 = steam["root"] / "steamapps" / "common" / "Counter-Strike Global Offensive" / "game" / "bin" / "linuxsteamrt64" / "cs2"
+    cs2.write_bytes(b"\x7fELF" + b"\0" * 60)
+    cs2.chmod(0o755)
+    (steam["root"] / "steamapps" / "compatdata" / "730").mkdir()
+    monkeypatch.setenv("GOPT_STEAM_ROOT", str(steam["root"]))
+    lines = []
+    cli.main(["library"], out=lines.append, paths=Paths(tmp_path / "h"))
+    row = [l for l in lines if "Counter-Strike 2" in l][0]
+    assert " native " in row

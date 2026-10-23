@@ -29,6 +29,7 @@ def build_steam_root(tmp: Path, with_cs2_video: bool = True, with_eecfg: bool = 
     cs2dir = root / "steamapps" / "common" / "Counter-Strike Global Offensive" / "game" / "bin" / "linuxsteamrt64"
     cs2dir.mkdir(parents=True)
     (cs2dir / "cs2").write_bytes(b"\x7fELF")
+    (cs2dir / "cs2").chmod(0o755)                  # Steam installs Linux executables with the x bit
     # users
     shutil.copy(FIX / "loginusers.vdf", root / "config" / "loginusers.vdf")
     userdata = root / "userdata" / "52079950"      # 76561198012345678 - 76561197960265728
