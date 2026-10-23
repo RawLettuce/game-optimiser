@@ -1,0 +1,192 @@
+# Warframe adapter (Proton, app 230410). Sources and status tags: ADAPTERS-RESEARCH.md table W1.
+# status: P primary, S secondary, V verified on PC (dated), U unverified (confirmed by `gopt discover`).
+
+[game]
+id = "warframe"
+name = "Warframe"
+appid = 230410
+runtime = "proton"
+program = "Warframe.x64.exe"
+processes = ["Warframe.x64.exe", "Launcher.exe"]
+headroom = 1.25
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/AppData/Local/Warframe/EE.cfg"
+format = "eecfg"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "-high", "LD_PRELOAD"]
+
+# Keys forced for the duration of a tuning session and restored afterwards (by undo of the session's backups).
+[[run_overrides]]
+key = "Graphics.AutoDetectGraphicsSettings"
+value = "0"
+status = "S"
+why = "stops the game re-detecting and overwriting edited settings on launch"
+restore = false
+
+[[run_overrides]]
+key = "Graphics.MaxFramerate"
+value = "0"
+status = "U"
+why = "the fps cap must be off while measuring"
+manual = "Options > Display > Max Framerate: set to the maximum (uncapped) for the tuning runs"
+
+[[run_overrides]]
+key = "Graphics.VSync"
+value = "0"
+status = "U"
+why = "VSync must be off while measuring"
+manual = "Options > Display > Vertical Sync: Off for the tuning runs"
+
+[[settings]]
+id = "upscaling"
+label = "Upscaling"
+key = "Graphics.Upscaling"
+levels = ["DLSS_PERFORMANCE", "DLSS_BALANCED", "DLSS_QUALITY", "OFF"]
+labels = ["DLSS Performance", "DLSS Balanced", "DLSS Quality", "Off (native)"]
+cost = [1.00, 1.18, 1.42, 1.82]
+cpu = false
+visual = 3
+upscaling = true
+status = "U"
+
+[[settings]]
+id = "geometry"
+label = "Geometry Quality"
+key = "Graphics.GeometryQuality"
+levels = ["GQ_LOW", "GQ_MEDIUM", "GQ_HIGH", "GQ_LUDICROUS"]
+labels = ["Low", "Medium", "High", "Ludicrous"]
+cost = [1.00, 1.03, 1.06, 1.12]
+cpu = true
+visual = 3
+status = "U"
+
+[[settings]]
+id = "shadows"
+label = "Shadow Quality"
+key = "Graphics.ShadowQuality"
+levels = ["SQ_LOW", "SQ_MEDIUM", "SQ_HIGH", "SQ_LUDICROUS"]
+labels = ["Low", "Medium", "High", "Ludicrous"]
+cost = [1.00, 1.05, 1.10, 1.22]
+cpu = false
+visual = 4
+status = "S"
+
+[[settings]]
+id = "textures"
+label = "Texture Memory"
+key = "Graphics.TextureQuality"
+levels = ["TQ_LOW", "TQ_MEDIUM", "TQ_HIGH"]
+labels = ["Low", "Medium", "High"]
+cost = [1.00, 1.01, 1.02]
+cpu = false
+visual = 4
+vram_mb = [3000, 5000, 7000]
+status = "S"
+
+[[settings]]
+id = "gpu_particles"
+label = "GPU Particles"
+key = "Graphics.GpuParticles"
+levels = ["GPQ_DISABLED", "GPQ_LOW", "GPQ_MEDIUM", "GPQ_HIGH", "GPQ_LUDICROUS"]
+labels = ["Disabled", "Low", "Medium", "High", "Ludicrous"]
+cost = [1.00, 1.03, 1.06, 1.10, 1.18]
+cpu = false
+visual = 3
+status = "U"
+
+[[settings]]
+id = "antialiasing"
+label = "Anti-Aliasing"
+key = "Graphics.AntiAliasing"
+levels = ["AA_DISABLED", "AA_FXAA", "AA_SMAA", "AA_TEMPORAL"]
+labels = ["Off", "FXAA", "SMAA", "TAA"]
+cost = [1.00, 1.01, 1.03, 1.05]
+cpu = false
+visual = 4
+status = "S"
+
+[[settings]]
+id = "ambient_occlusion"
+label = "Ambient Occlusion"
+key = "Graphics.AmbientOcclusion"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.06]
+cpu = false
+visual = 3
+status = "U"
+
+[[settings]]
+id = "volumetric"
+label = "Volumetric Lighting"
+key = "Graphics.VolumetricLighting"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.06]
+cpu = false
+visual = 3
+status = "U"
+
+[[settings]]
+id = "reflections"
+label = "Local Reflections"
+key = "Graphics.LocalReflections"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.05]
+cpu = false
+visual = 3
+status = "U"
+
+[[settings]]
+id = "dynamic_lighting"
+label = "Dynamic Lighting"
+key = "Graphics.DynamicLighting"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.04]
+cpu = true
+visual = 3
+status = "U"
+
+[[settings]]
+id = "depth_of_field"
+label = "Depth of Field"
+key = "Graphics.DepthOfField"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.02]
+cpu = false
+visual = 1
+status = "U"
+
+[[settings]]
+id = "bloom"
+label = "Bloom"
+key = "Graphics.Bloom"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.01]
+cpu = false
+visual = 1
+status = "U"
+
+[benchmark]
+scene = "captura"
+duration_s = 60
+confirm_duration_s = 90
+instructions = """
+Warframe benchmark (same every run, about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Open the Captura scene you chose for benchmarking (same scene every time).
+ 3. Stand on your marked spot. Press Shift+F2 to start the MangoHud log.
+ 4. Do one slow full turn (about 15 s), then spawn 3 enemies and fire at them for 20 s.
+ 5. Stay still for the remaining time. The log stops by itself after 60 s.
+ 6. Quit the game fully (the tool refuses to edit files while it runs).
+"""
