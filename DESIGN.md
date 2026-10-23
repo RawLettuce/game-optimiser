@@ -271,6 +271,8 @@ Exit codes: 0 done, 2 goal not met (best found applied or reported), 3 refused (
 
 ## 13. Milestones
 
+Status 23 Oct 2026: milestones 1 to 5 are built and tested in the cloud (88 tests); milestone 0 still has to run on the PC, and the Warframe launch profile experiments E2 and E3 are printed as manual steps rather than automated.
+
 0. Verification on the PC (no writes): read EE.cfg, cs2_video.txt and localconfig.vdf, confirm key names marked [U], confirm MangoHud version and that `log_interval=50` yields per sample rows, confirm process names, find `console.log`. Output: a dated `VERIFIED.md` and updated TOML statuses.
 1. Parsers, safety layer, probe, tests with fixtures. No game writes yet.
 2. `measure` with MangoHud for both games (manual settings), metrics, report.

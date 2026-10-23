@@ -2,8 +2,10 @@
 
 Read DESIGN-BRIEF.md (the ask), DESIGN.md (the design) and ADAPTERS-RESEARCH.md (per setting tables) first. Matthew's standing rules in the matthew-dev-rules skill apply; this file adds the project specifics.
 
-## State
-- Design only so far. No code. Next step after Matthew's review: Milestone 0 (read only verification on the Bazzite PC, see DESIGN.md 13 and ADAPTERS-RESEARCH.md 3), then Milestone 1 in a cloud session.
+## State (23 Oct 2026)
+- Built: `python3 -m gopt` with plan, tune, measure, undo, discover, library, games, show, probe, selftest. 88 tests green (`python3 -m pytest -q`). See HANDOVER.md for the PC commands and open items.
+- Not yet run on the PC. Milestone 0 (read only verification) and `discover` come first there.
+- Tests redirect everything with env vars: GOPT_HOME, GOPT_STEAM_ROOT, GOPT_ADAPTER_DIR. Regenerate CSV fixtures with `python3 tests/fixtures/make_logs.py`.
 
 ## Rules for this repo
 - Python 3.14 standard library only; no pip packages on the host. Own parsers for EE.cfg and Steam KeyValues with lossless round trip tests.
