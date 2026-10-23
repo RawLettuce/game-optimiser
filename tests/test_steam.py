@@ -75,6 +75,9 @@ def test_running_detection():
     assert Steam.any_running(["Warframe.x64.exe", "Launcher.exe"], procs) == ["Warframe.x64.exe"]
     assert Steam.any_running(["cs2"], procs) == ["cs2"]
     assert Steam.any_running(["cs2"], [("cs2fake", "/opt/cs2fake")]) == []
+    # the tool's own command line names the game but is not the game
+    assert Steam.any_running(["cs2"], [("python3", "/usr/bin/python3 -m gopt tune cs2 --goal 240")]) == []
+    assert Steam.any_running(["Warframe.x64.exe"], [("wine64-preloader", "Z:\\x\\Warframe.x64.exe -cluster:public")]) == ["Warframe.x64.exe"]
     assert not Steam.steam_running([("bash", "bash")])
 
 

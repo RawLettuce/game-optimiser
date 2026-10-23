@@ -139,16 +139,7 @@ cpu = false
 visual = 2
 status = "S"
 
-[[settings]]
-id = "hdr"
-label = "High Dynamic Range"
-key = "setting.videocfg_hdr_detail"
-levels = ["0", "1"]
-labels = ["Performance", "Quality"]
-cost = [1.00, 1.02]
-cpu = false
-visual = 2
-status = "U"
+# setting.videocfg_hdr_detail is left alone: a real file shows "-1" and the value meanings are unverified [U].
 
 [benchmark]
 scene = "workshop 3240880604 CS2 FPS BENCHMARK DUST2"

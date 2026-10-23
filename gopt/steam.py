@@ -178,8 +178,9 @@ class Steam:
             entries = list(proc.iterdir())
         except OSError:
             return out
+        me = str(os.getpid())
         for d in entries:
-            if not d.name.isdigit():
+            if not d.name.isdigit() or d.name == me:
                 continue
             try:
                 comm = (d / "comm").read_text(errors="replace").strip()
@@ -191,12 +192,16 @@ class Steam:
 
     @staticmethod
     def any_running(names: list[str], processes: list[tuple[str, str]]) -> list[str]:
-        """Names found among processes (comm or basename in cmdline, case insensitive)."""
+        """Names found among processes: comm equals the name (kernel truncates comm to 15 chars) or the
+        basename of the executable (first cmdline token) equals it. Arguments are ignored, so a
+        `gopt tune cs2` command line never counts as the game running."""
         found = []
         for name in names:
             nl = name.lower()
             for comm, cmd in processes:
-                if comm.lower() == nl[:15].lower() or re.search(r"(^|[\\/ ])" + re.escape(nl) + r"(\s|$)", cmd.lower()):
+                exe = cmd.split(" ", 1)[0] if cmd else ""
+                base = exe.replace("\\", "/").rsplit("/", 1)[-1].lower()
+                if comm.lower() == nl[:15] or base == nl:
                     found.append(name)
                     break
         return found

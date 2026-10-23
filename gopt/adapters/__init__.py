@@ -19,6 +19,12 @@ from ..safety import read_text_or_refuse
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "adapters"
 
 
+def data_dir() -> Path:
+    """Adapter data folder; GOPT_ADAPTER_DIR overrides it (tests, or a user copy)."""
+    import os
+    return Path(os.environ.get("GOPT_ADAPTER_DIR") or DATA_DIR)
+
+
 @dataclass
 class Setting:
     id: str
@@ -81,8 +87,8 @@ class Adapter:
 
     # ---- loading ----------------------------------------------------
     @classmethod
-    def load(cls, game: str, data_dir: Path = DATA_DIR) -> "Adapter":
-        path = Path(data_dir) / f"{game}.toml"
+    def load(cls, game: str, data_dir_override: Path | None = None) -> "Adapter":
+        path = Path(data_dir_override or data_dir()) / f"{game}.toml"
         if not path.exists():
             raise Refusal(f"no adapter for {game!r} (looked for {path}); `gopt library` lists installed games")
         with open(path, "rb") as f:
@@ -108,8 +114,8 @@ class Adapter:
         return ad
 
     @staticmethod
-    def available(data_dir: Path = DATA_DIR) -> list[str]:
-        return sorted(p.stem for p in Path(data_dir).glob("*.toml"))
+    def available(data_dir_override: Path | None = None) -> list[str]:
+        return sorted(p.stem for p in Path(data_dir_override or data_dir()).glob("*.toml"))
 
     def learned_path(self) -> Path:
         return Path(self.source).with_suffix(".learned.json")
