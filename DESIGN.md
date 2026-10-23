@@ -149,7 +149,7 @@ Learned costs are written to `data/adapters/<game>.learned.json` (dated, per har
 ## 7. File formats and parsers
 
 ### 7.1 Warframe EE.cfg
-Location under Proton: `~/.local/share/Steam/steamapps/compatdata/230410/pfx/drive_c/users/steamuser/AppData/Local/Warframe/EE.cfg` [S 9, S 10]. Shape: INI-like sections such as `[Name,/EE/Types/...]` with `Key=Value` lines [S 12]. Only non default settings are written; a key left at default disappears from the file, so the writer must add missing keys rather than only editing existing ones [S 11]. Deleting the file resets everything to defaults [S 11]. `Graphics.AutoDetectGraphicsSettings=0` stops the game re-detecting and overwriting edits on launch (wiki lists the key with values 0/1 and default 1; the overwrite claim is from one community guide) [S 11, S 12]. The parser is lossless: unknown lines, order and blank lines are preserved and only planned keys change.
+Location under Proton: `~/.local/share/Steam/steamapps/compatdata/230410/pfx/drive_c/users/steamuser/AppData/Local/Warframe/EE.cfg` [S 9, S 10]. Shape: INI-like sections such as `[Name,/EE/Types/...]` with `Key=Value` lines [S 12]. The graphics section header is [U]; the writer uses the section that already holds a `Graphics.` key, else the one whose header ends in `_Config,/EE/Types/Base/Config`, else refuses. Only non default settings are written; a key left at default disappears from the file, so the writer must add missing keys rather than only editing existing ones [S 11]. Deleting the file resets everything to defaults [S 11]. `Graphics.AutoDetectGraphicsSettings=0` stops the game re-detecting and overwriting edits on launch (wiki lists the key with values 0/1 and default 1; the overwrite claim is from one community guide) [S 11, S 12]. The parser is lossless: unknown lines, order and blank lines are preserved and only planned keys change.
 
 Known keys and values: Graphics.AntiAliasing in {AA_DISABLED, AA_FXAA, AA_SMAA, AA_TEMPORAL} [S 11], Graphics.ShadowQuality=SQ_HIGH and Graphics.TextureQuality=TQ_LOW seen in a player's file [S 11], Graphics.AutoDetectGraphicsSettings 0/1 [S 11]. Everything else in ADAPTERS-RESEARCH.md table W1 is [U] and is learned by `gopt discover` (7.3). The wiki (wiki.warframe.com/w/Settings/Config) could not be opened from this container; Matthew's PC can.
 
@@ -162,7 +162,9 @@ Steam KeyValues text. Location: `{userdata}/730/local/cfg/cs2_video.txt` (Window
 Because the wikis are partly unreachable from the cloud and value names drift between game versions, the adapter learns its key map empirically: the tool snapshots the settings file, asks Matthew to change exactly one named option in the game's menu and quit, then diffs the file and records `menu option -> key, old value, new value` in `data/adapters/<game>.learned.json`. One pass through the Warframe and CS2 video menus (about 15 minutes each) fills the [U] cells. This is a read only operation plus a JSON write in the tool's own data folder.
 
 ### 7.4 Steam localconfig.vdf
-`{userdata}/config/localconfig.vdf`, text KeyValues. Tools that set launch options walk `Software > Valve > Steam > apps > <appid>` and write `LaunchOptions` under the app [S 20]; the top level key name is [U] and is confirmed on the PC in Milestone 0 by reading the file. Steam must be closed [S 20]. A corrupted file silently resets preferences [S 20], so the writer does a minimal textual edit of one quoted value inside the located block, then re-parses and compares trees. Launch option edits are batched: one edit at the start of a tuning session (add the MangoHud wrapper, remove gamescope) and one at the end (remove the wrapper unless `--keep-hud`), so Steam is restarted twice per session, not per run.
+`{userdata}/config/localconfig.vdf`, text KeyValues. Tools that set launch options walk `Software > Valve > Steam > apps > <appid>` and write `LaunchOptions` under the app [S 20]; the top level key name is [U] and is confirmed on the PC in Milestone 0 by reading the file. Steam must be closed [S 20]. A corrupted file silently resets preferences [S 20].
+
+Default behaviour (changed after the self review, see REVIEW.md): the tool only reads this file. It prints the current launch options and the exact replacement string (`mangohud %command%`, gamescope removed) for Matthew to paste into the game's Properties dialog in Steam, which needs no Steam restart. `--write-launch-options` enables the file edit: typed YES, Steam closed check, backup, a minimal textual edit of one quoted value inside the located block, then re-parse and tree comparison. The launch option is constant across a session because per run MangoHud settings live in MangoHud's per application config file (section 9), not in the launch option.
 
 ## 8. Search strategy and why
 
@@ -180,6 +182,7 @@ Each play run costs Matthew about two minutes, so the search is designed around 
 4. Run 2: the highest rung whose predicted fps is at least goal x headroom x (1 + margin). This is usually within one or two rungs of the answer.
 5. Runs 3 and 4: bisection between the last passing and last failing rung, with the model choosing the probe point (secant step) instead of the midpoint when the last prediction error was small.
 6. Final run: 90 s confirmation on the chosen rung. If it fails, step down one rung without another run and say so.
+Measured pass or fail decides, never the model. If a higher rung passed while a lower one failed (noise), the lower rung is preferred and the inversion is reported. A failing rung is never reported as passing.
 7. Stop early when the top rung passes (goal met at max quality) or the bottom rung fails (report the best found and the bound classification). In the CPU bound case the tool says plainly that graphics settings cannot reach the goal and reports what the GPU side headroom is worth instead.
 
 Priority mode (quality, balanced, fps) with no numeric goal maps to a goal of the display refresh rate x {0.5, 0.75, 1.0} and a 1 percent low ratio of {0.6, 0.7, 0.8}; the tool prints the derived goal before planning.
@@ -189,7 +192,7 @@ A rung passes when average fps >= goal, 1 percent low (average of the slowest 1 
 
 ## 9. Measurement with MangoHud
 
-MangoHud ships on Bazzite [P 3]. The tool writes a per run config and starts the game through Steam with `MANGOHUD_CONFIGFILE=<path> mangohud %command%` in the launch options (the README documents `mangohud %command%` and `MANGOHUD_CONFIGFILE`; `MANGOHUD_CONFIG` env takes priority over config files) [P 1]. Config written per run:
+MangoHud ships on Bazzite [P 3]. The launch option is the constant `mangohud %command%` [P 1]. The per run settings go in MangoHud's per application config file, `~/.config/MangoHud/wine-Warframe.x64.conf` for the Proton app and `~/.config/MangoHud/cs2.conf` for the native binary (README: `~/.config/MangoHud/<application_name>.conf` for native applications, `wine-<application_name>.conf` for wine or Proton apps) [P 1]. That file is backed up and restored like any other. Config written per run:
 
 ```
 output_folder=/var/home/mpaylor/.local/share/game-optimiser/runs/<run-id>/logs
@@ -212,7 +215,7 @@ Benchmark scenes (sections per game):
 - Warframe. No built in benchmark. Captura has 34 scenes, a movable camera while paused, slow motion, and can spawn up to three enemies from completed scans [S 25], so it is repeatable and offline. Proposed scene: one owned Captura scene, standing at a marked spot, one slow full turn, then spawn three enemies and fire for 20 s; 60 s total, same every run. Because missions with four players and heavy effects are heavier than Captura, the adapter applies `headroom = 1.25` by default, calibrated once by letting MangoHud log a real mission (`gopt measure warframe --free-play`) and comparing its average with the Captura run; the learned headroom replaces the default. Reviewers discard the first run after a settings change and expect about 1 percent spread between repeats [S 26]; the tool therefore ignores the first 10 s of every log (shader compile, DX12 shader caching stutter is reported for Warframe [S 27]).
 - CS2. Workshop map "CS2 FPS BENCHMARK DUST2" (id 3240880604, by Angel, created 6 May 2024) runs an automated flythrough with grenades, smokes and gunfire, starts automatically on map load, has its last four bots stationary for consistency and prints Avg FPS and P1 (1 percent low) to the console [S 17, S 18]. MangoHud is the primary measurement so both games use one method; the map's console numbers are a cross check, captured with `-condebug` to `console.log` (its CS2 Linux path is [U]) [S 28]. Runs are 60 s to 90 s and the first 10 s are ignored.
 
-The tool detects run completion by waiting for the CSV to stop growing for 15 s or for `log_duration` to elapse, then asks Matthew one question when a launch profile experiment is active (section 10): "fullscreen on the AGON and keyboard working? y/n".
+Elapsed time within a log is the cumulative sum of frametimes; the `elapsed` column's unit is not documented and is ignored. The tool detects run completion by waiting for the CSV to stop growing for 15 s or for `log_duration` to elapse (or takes `--log-file` in tests and non interactive use), then asks Matthew one question when a launch profile experiment is active (section 10): "fullscreen on the AGON and keyboard working? y/n".
 
 ## 10. Warframe launch profile experiments (removing gamescope, fixing the KDE focus bug)
 
@@ -250,10 +253,13 @@ Run id is `YYYYMMDD-HHMMSS-<game>`.
 ```
 gopt probe [--refresh]                       hardware and environment, prints fingerprint and cache status
 gopt games                                   installed supported games, config paths, running state, Proton version
+gopt library                                 every installed Steam game from libraryfolders.vdf and appmanifest_*.acf, with adapter status
+gopt selftest                                runs the bundled test suite on the PC
 gopt show <game>                             current settings, launch options, last run and backups
 gopt discover <game>                         learn key names and values by diffing after one in game change (loop)
 gopt plan <game> --goal 3840x2160@90 | --priority quality|balanced|fps [--pin KEY=VAL]... [--no-upscaling] [--max-runs 6]
-gopt tune <game> (same options) [--apply]    the measure and adjust loop; dry run prints the plan and the first rung only
+gopt tune <game> (same options) [--apply] [--log-file CSV]... [--yes] [--write-launch-options]
+                                             the measure and adjust loop; dry run prints the plan and the first rung only
 gopt measure <game> [--free-play]            one logged run at current settings, metrics only, no writes except the MangoHud config
 gopt apply <plan.json> --apply               apply a saved plan (typed YES for localconfig.vdf)
 gopt undo <run-id> [--force]                 restore every file from the run's manifest, once
