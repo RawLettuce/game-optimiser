@@ -36,10 +36,10 @@ Method: each line of the brief was checked against the design, then the design w
 
 ## Things only Matthew or his PC can settle (skipped, listed in HANDOVER.md)
 
-- Every [U] key name and value in ADAPTERS-RESEARCH.md tables W1 and C1.
-- The localconfig.vdf top level key and whether `LaunchOptions` sits directly under the appid.
-- Process names as seen by `ps` for Warframe under Proton.
-- The CS2 `console.log` path on Linux.
-- Whether `kscreen-doctor --json` exists on Plasma 6.7.5.
-- Whether GE-Proton is installed (for experiment E3) and which Proton Warframe currently uses.
+- Every [U] key name and value in ADAPTERS-RESEARCH.md tables W1 and C1. Partly answered 23 Oct 2026: EE.cfg holds ten Graphics keys (UpscaleMethod and UpscaleQuality, not Graphics.Upscaling); the rest wait for `discover`.
+- The localconfig.vdf top level key and whether `LaunchOptions` sits directly under the appid. Answered 23 Oct 2026: `UserLocalConfigStore`, yes (apps/230410/LaunchOptions).
+- Process names as seen by `ps` for Warframe under Proton. Still open (executables exist; game not run).
+- The CS2 `console.log` path on Linux. Still open: the file appears only after a `-condebug` run.
+- Whether `kscreen-doctor --json` exists on Plasma 6.7.5. Answered 23 Oct 2026: yes, `-j` and `--json`.
+- Whether GE-Proton is installed (for experiment E3) and which Proton Warframe currently uses. Answered 23 Oct 2026: not installed; Proton Experimental 11.0.
 - The decision whether DLSS upscaling counts as acceptable for a "3840x2160 at 90" goal (default yes; `--no-upscaling` to refuse).

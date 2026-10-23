@@ -45,7 +45,15 @@ class Setting:
     status: str = "U"
     vram_mb: list[int] | None = None
     fallback: str | None = None      # upscaling only: the level tried when native cannot reach the goal
-    guess: bool = False              # key name not from any source: kept out of the ladder until discover verifies it
+    guess: bool = False              # key name or a level value not from any source: kept out of the ladder until discover verifies it
+    # companion keys written with the main key, one value per level ("" leaves that key as it is at that level);
+    # Warframe: UpscaleMethod is the main key, UpscaleQuality its companion (EE.cfg on the PC, 23 Oct 2026)
+    extra_keys: dict[str, list[str]] = field(default_factory=dict)
+
+    def __post_init__(self):
+        for k, vals in self.extra_keys.items():
+            if len(vals) != len(self.levels):
+                raise ValueError(f"setting {self.id}: extra key {k} has {len(vals)} values for {len(self.levels)} levels")
 
     @property
     def usable(self) -> bool:
@@ -63,6 +71,27 @@ class Setting:
             if lv.lower() == v.lower():
                 return i
         return None
+
+    def keys(self) -> list[str]:
+        return [self.key] + list(self.extra_keys)
+
+    def level_from(self, values: dict[str, str | None]) -> int | None:
+        """Level from the main key, then checked against the companion keys that level sets
+        (Warframe UM_DLSS with UQ_PERFORMANCE is not 'DLSS Quality': unrecognised, not a guess)."""
+        lv = self.level_of(values.get(self.key))
+        if lv is None:
+            return None
+        for k, vals in self.extra_keys.items():
+            want = vals[lv]
+            if want and (values.get(k) or "").strip().lower() != want.lower():
+                return None
+        return lv
+
+    def values_for(self, lv: int) -> dict[str, str]:
+        """Key -> value written for a level (companions with "" are left alone)."""
+        out = {self.key: self.levels[lv]}
+        out.update({k: vals[lv] for k, vals in self.extra_keys.items() if vals[lv]})
+        return out
 
 
 @dataclass
@@ -114,7 +143,10 @@ class Adapter:
         if fs.get("format") and fs["format"] not in FORMATS:
             raise Refusal(f"{path}: unknown settings format {fs['format']!r}")
         lo = d.get("launch_options", {})
-        settings = [Setting(**{k: v for k, v in s.items()}) for s in d.get("settings", [])]
+        try:
+            settings = [Setting(**{k: v for k, v in s.items()}) for s in d.get("settings", [])]
+        except (TypeError, ValueError) as e:
+            raise Refusal(f"{path}: {e}")
         overrides = [Override(**o) for o in d.get("run_overrides", [])]
         ad = cls(id=g["id"], name=g["name"], appid=int(g["appid"]), runtime=g["runtime"], program=g["program"],
                  processes=list(g.get("processes", [])), headroom=float(g.get("headroom", 1.0)),
@@ -206,11 +238,12 @@ class Adapter:
         """Current value of every adapter setting and override key (None when absent, or when the
         file does not exist yet and the adapter creates it on the first write)."""
         if path is None or (self.create_if_missing and not Path(path).exists()):
-            return {k: None for k in [s.key for s in self.settings] + [o.key for o in self.overrides]}
+            return {k: None for k in [k for s in self.settings for k in s.keys()] + [o.key for o in self.overrides]}
         doc = self.load_doc(path)
         out = {}
         for s in self.settings:
-            out[s.key] = self._get(doc, s.key)
+            for k in s.keys():
+                out[k] = self._get(doc, k)
         for o in self.overrides:
             out[o.key] = self._get(doc, o.key)
         return out
@@ -276,7 +309,7 @@ class Adapter:
         return doc
 
     def current_levels(self, values: dict[str, str | None]) -> dict[str, int | None]:
-        return {s.id: s.level_of(values.get(s.key)) for s in self.settings}
+        return {s.id: s.level_from(values) for s in self.settings}
 
     def changes_for_rung(self, rung: dict[str, int], current: dict[str, str | None]) -> dict[str, str]:
         """Key -> value edits needed to reach a rung from the current file (unchanged keys omitted)."""
@@ -284,11 +317,22 @@ class Adapter:
         for s in self.settings:
             if s.id not in rung:
                 continue
-            want = s.levels[rung[s.id]]
-            cur = current.get(s.key)
-            if cur is None or cur.strip().lower() != want.lower():
-                out[s.key] = want
+            for key, want in s.values_for(rung[s.id]).items():
+                cur = current.get(key)
+                if cur is None or cur.strip().lower() != want.lower():
+                    out[key] = want
         return out
+
+    def needs_discover(self, s: Setting, values: dict[str, str | None], path: Path | None) -> bool:
+        """True when a setting must wait for `gopt discover`: a guessed key, or a key the settings file
+        does not contain yet and no discover run has verified. Warframe writes most Graphics keys to
+        EE.cfg only once they are changed in game (seen on the PC, 23 Oct 2026). Adapters that create
+        their file (Garry's Mod autoexec.cfg) are exempt: every key starts absent there by design."""
+        if not s.usable:
+            return True
+        if s.status == "V" or path is None or self.create_if_missing:
+            return False
+        return any(values.get(k) is None for k in s.keys())
 
     def override_changes(self, current: dict[str, str | None]) -> tuple[dict[str, str], list[Override]]:
         """(automatic key edits, overrides that must be done by hand because their key is unverified)."""

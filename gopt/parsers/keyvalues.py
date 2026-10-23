@@ -25,10 +25,12 @@ class Node:
     open_span: tuple[int, int] | None = None   # position of '{'
     close_span: tuple[int, int] | None = None  # position of '}'
 
-    def child(self, key: str) -> "Node | None":
+    def child(self, key: str, block: bool = False) -> "Node | None":
+        """First child with this key (case insensitive); with block=True the first one that is a block,
+        skipping plain values of the same name."""
         kl = key.lower()
         for c in self.children:
-            if c.key.lower() == kl:
+            if c.key.lower() == kl and (not block or c.value is None):
                 return c
         return None
 
@@ -152,24 +154,27 @@ class KeyValues:
             raise KeyValuesError("unexpected end of file (unbalanced braces or dangling key)")
 
     # ---- reading -----------------------------------------------------
-    def root(self, key: str | None = None) -> Node | None:
+    def root(self, key: str | None = None, block: bool = False) -> Node | None:
         if key is None:
             return self.roots[0] if self.roots else None
         kl = key.lower()
         for r in self.roots:
-            if r.key.lower() == kl:
+            if r.key.lower() == kl and (not block or r.value is None):
                 return r
         return None
 
     def find(self, path: list[str]) -> Node | None:
-        """Case insensitive path lookup starting at the roots."""
+        """Case insensitive path lookup starting at the roots. Every step but the last must be a block,
+        so a plain value with the same name is skipped: localconfig.vdf on the PC has a string
+        "230410" (a binary ticket) long before the apps/230410 block (23 Oct 2026)."""
         if not path:
             return None
-        node = self.root(path[0])
-        for key in path[1:]:
+        last = len(path) == 1
+        node = self.root(path[0], block=not last)
+        for i, key in enumerate(path[1:], start=2):
             if node is None:
                 return None
-            node = node.child(key)
+            node = node.child(key, block=i < len(path))
         return node
 
     def get(self, path: list[str], default=None):

@@ -10,7 +10,8 @@ Honest summary first: no controlled one setting at a time benchmark of Warframe 
 - Settings: `.../steamapps/compatdata/230410/pfx/drive_c/users/steamuser/AppData/Local/Warframe/EE.cfg` [S 10, S 9]. INI-like, `[Section,/EE/Types/...]` headers and `Key=Value` lines [S 12]. Non default keys only; missing key means default [S 11].
 - Launcher choices (Graphics API DirectX 11 or 12, Graphics Engine Classic or Enhanced) are made in the launcher's Settings dialog [S 44]; storage key [U].
 - Launch options: `localconfig.vdf` (DESIGN.md 7.4). Current stopgap uses gamescope; target state has none.
-- Process names: `Warframe.x64.exe`, `Launcher.exe` [U].
+- Process names: `Warframe.x64.exe`, `Launcher.exe` [U]. The install folder holds Warframe.x64.exe, Launcher.exe, RemoteCrashSender.exe and Tools/ [V 23 Oct 2026]; the names as `ps` shows them while the game runs are still [U].
+- Seen in EE.cfg on the PC [V 23 Oct 2026]: section `[Windows_Config,/EE/Types/Base/Config]` (line 1222) holds only ten Graphics keys: WindowMode=MODE_BORDERLESS, FullScreenSizeX=3840, FullScreenSizeY=2160, UpscaleMethod=UM_DLSS, UpscaleQuality=UQ_QUALITY, UpscaleSharpening=0.5, AutoDetectGraphicsSettings, EnableMotionBlur, HLODDistanceScale, ImposterDistanceScale. So the game already runs borderless at 3840x2160 with DLSS Quality. Every other Graphics key in W1 is absent: the game writes a key only once it is changed in game, so those wait for `gopt discover warframe` and the tool never writes an absent key before then (`Adapter.needs_discover`).
 
 ### 1.2 Display options and levels (what exists)
 From the wiki's Settings/Display page [S 13] and the Settings page [S 11]: Display Mode, Video Resolution, Refresh Rate, Aspect Ratio, Vertical Sync, Max Framerate, Brightness, Contrast, Field of View, Show FPS, Dynamic Lighting, Volumetric Lighting, Local Reflections, Quality Preset, Geometry Quality (Low, Medium, High, Ludicrous), Shadow Quality (Low, Medium, High, Ludicrous), Texture Memory (Low, Medium, High), GPU Particles (Disabled, Low, Medium, High, Ludicrous), Anti-Aliasing (EE.cfg values AA_DISABLED, AA_FXAA, AA_SMAA, AA_TEMPORAL), Upscaling (Off, FSR 2.2, DLSS; DLSS only on RTX cards; quality levels Auto to Ultra Performance; Sharpening slider), Dynamic Resolution (unavailable when upscaling is on), Optimized Flip-Model (not available on DirectX 12). Other toggles named by guides [S 45, S 46]: Depth of Field, Motion Blur, Bloom, Distortions, Glare, Film Grain, Ambient Occlusion, Particle System Quality (older guides) and the launcher's DirectX 12 (Beta) and Enhanced engine.
@@ -20,9 +21,9 @@ Key column: wiki or player file where tagged, otherwise a guess to be confirmed 
 
 | Menu option | EE.cfg key (status) | Levels low to high | Cost per level | CPU side | Visual value | Basis |
 |---|---|---|---|---|---|---|
-| Upscaling | Graphics.Upscaling [U] | Off, DLSS Quality, DLSS Balanced, DLSS Performance | 1.00 at DLSS Quality vs about 1.6 to 1.8 native 4K (render 1440p vs 2160p is 2.25x pixels) | no | DLSS Quality at 4K rated near native by guides [S 46] | pixel ratio; HotHardware tested the 1999 demo at 4K with Quality upscaling, which renders at 2560x1440 [S 47] |
+| Upscaling | Graphics.UpscaleMethod with Graphics.UpscaleQuality: UM_DLSS + UQ_QUALITY for DLSS Quality [V 23 Oct 2026]; there is no Graphics.Upscaling key; the Off value (UM_NONE?) is [U] until discover | Off, DLSS Quality (Balanced and Performance dropped: Matthew allows DLSS Quality only) | 1.00 at DLSS Quality vs about 1.6 to 1.8 native 4K (render 1440p vs 2160p is 2.25x pixels) | no | DLSS Quality at 4K rated near native by guides [S 46] | pixel ratio; HotHardware tested the 1999 demo at 4K with Quality upscaling, which renders at 2560x1440 [S 47] |
 | Dynamic Resolution | Graphics.DynamicResolution [U] | Off, On | not modelled (off during tuning so measurements are stable) | no | 2 | wiki: unavailable with upscaling [S 13] |
-| Geometry Quality | Graphics.GeometryQuality [U] | Low, Medium, High, Ludicrous | 1.00, 1.03, 1.06, 1.12 | yes (draw calls) | 3 | ranked guess; no measured source |
+| Geometry Quality | Graphics.GeometryQuality [U], absent from the file on 23 Oct 2026 | Low, Medium, High, Ludicrous | 1.00, 1.03, 1.06, 1.12 | yes (draw calls) | 3 | ranked guess; no measured source |
 | Shadow Quality | Graphics.ShadowQuality (key [S 11], value SQ_HIGH seen; SQ_LOW/SQ_MEDIUM/SQ_LUDICROUS [U]) | SQ_LOW, SQ_MEDIUM, SQ_HIGH, SQ_LUDICROUS | 1.00, 1.05, 1.10, 1.22 | partly | 4 | guides: high shadows cost the most for little gain [S 45]; CS2's measured shadow curve (Low to Very High minus 22 percent) used as the shape |
 | Texture Memory | Graphics.TextureQuality (key seen as TQ_LOW [S 11]; menu name differs) | TQ_LOW, TQ_MEDIUM, TQ_HIGH | 1.00, 1.01, 1.02 unless VRAM is full | no | 4 | textures cost little fps until VRAM overflows; 8 GB card at 4K, so the ladder caps this when gpu_vram_used approaches 7.5 GB |
 | GPU Particles | Graphics.GpuParticles [U]; Android guide shows a GPUParticlesQuality key with GPQ_LOW to GPQ_LUDICROUS values [S 12] | Disabled, Low, Medium, High, Ludicrous | 1.00, 1.03, 1.06, 1.10, 1.18 | no | 3 | players cut particles first in heavy missions [S 48]; shape from CS2 particle measurements (High minus 4.8 percent, Very High minus 10 percent) |
@@ -33,14 +34,14 @@ Key column: wiki or player file where tagged, otherwise a guess to be confirmed 
 | Local Reflections | Graphics.LocalReflections [U] | Off, On | 1.00, 1.05 | no | 3 | screen space reflections; estimate |
 | Dynamic Lighting | Graphics.DynamicLighting [U] | Off, On | 1.00, 1.04 | partly | 3 | estimate |
 | Depth of Field | Graphics.DepthOfField [U] | Off, On | 1.00, 1.02 | no | 1 | guides: enable for quality, cheap [S 45] |
-| Motion Blur | Graphics.MotionBlur [U] | Off, On | 1.00, 1.02 | no | 0 (most players turn it off) | estimate |
+| Motion Blur | Graphics.EnableMotionBlur [V 23 Oct 2026, key present] (not tuned) | Off, On | 1.00, 1.02 | no | 0 (most players turn it off) | estimate |
 | Bloom, Glare, Distortions, Film Grain | [U] | Off, On | 1.00, 1.01 each | no | 1, 0, 0, 0 | guides turn Distortions, Glare and Film Grain off and keep Bloom [S 45] |
-| Max Framerate | Graphics.MaxFramerate [U] | number or off | forced off during runs, restored after | | | measurement needs the cap off |
-| Vertical Sync | Graphics.VSync [U] | Off, On | forced off during runs | | | same |
-| Display Mode and Resolution | Graphics.Fullscreen [U], Graphics.Resolution [U] | Fullscreen, 3840x2160 explicit | fixed by goal | | | ProtonDB: fullscreen works where borderless did not [S 33] |
+| Max Framerate | Graphics.MaxFramerate [U], absent from the file on 23 Oct 2026 (set by hand for runs until discover) | number or off | forced off during runs, restored after | | | measurement needs the cap off |
+| Vertical Sync | Graphics.VSync [U], absent from the file on 23 Oct 2026 (set by hand for runs) | Off, On | forced off during runs | | | same |
+| Display Mode and Resolution | Graphics.WindowMode=MODE_BORDERLESS, Graphics.FullScreenSizeX/Y=3840/2160 [V 23 Oct 2026]; shown by `gopt show`, never written | Borderless at 3840x2160 (current) | fixed by goal | | | Matthew's target is borderless (DESIGN.md 10, E1); ProtonDB: fullscreen works where borderless did not [S 33] |
 | Graphics API (launcher) | [U], manual rung | DirectX 11, DirectX 12 | DX12 on NVIDIA via vkd3d-proton widely reported slower than Windows [S 41]; DX12 shader caching stutter reported [S 27] | | | the tool tests DX11 first, DX12 as a separate manual rung |
 | Graphics Engine (launcher) | [U], manual rung | Classic, Enhanced | unknown | | Enhanced is the current renderer | guide: leave Enhanced unless struggling [S 44] |
-| AutoDetect | Graphics.AutoDetectGraphicsSettings (0/1, default 1) [S 11] | 0 | set to 0 with the first write so the game stops overwriting edits [S 12] | | | |
+| AutoDetect | Graphics.AutoDetectGraphicsSettings (0/1, default 1) [S 11], key present [V 23 Oct 2026] | 0 | set to 0 with the first write so the game stops overwriting edits [S 12] | | | |
 
 ### 1.4 Published performance anchors for Warframe
 | Source | Hardware | Result | Use |
@@ -60,12 +61,13 @@ Captura (34 scenes, pausable camera, up to three spawned enemies) [S 25] as desc
 Three heavy, repeatable Captura scenes are offered on the first run (Matthew picks; the choice is saved): Plains Of Eidolon Scene, Orb Vallis Scene, Deimos Cambion Drift Scene. All three are open world landscape tiles in WFCD's item data (unique names `PhotoboothTile...`, tradable) [P 50]; open world scenes are the heaviest (long draw distance, foliage, fog) and are the only ones with time of day and rain sliders, which are set the same every run [S 25]. Which of them Matthew owns is [U]; any other owned scene can be typed in instead. Dense alternatives if none is owned: Höllvanian Intersection In Winter Scene (1999 city) or Castle Town Scene (Duviri) [P 50].
 
 ### 1.6 Safe launch options for Warframe
-- Allowed: `MANGOHUD_CONFIGFILE=<path> mangohud %command%` [P 1]; `%command% --in-process-gpu` (launcher fix under the Wine Wayland driver) [S 38]; `PROTON_ENABLE_WAYLAND=1` only with a Proton that exposes it (GE-Proton 10 or newer) [S 36].
+- Allowed: `MANGOHUD_CONFIGFILE=<path> mangohud %command%` [P 1]; `%command% --in-process-gpu` (launcher fix under the Wine Wayland driver) [S 38]; `PROTON_ENABLE_WAYLAND=1` only with a Proton that exposes it (GE-Proton 10 or newer) [S 36]. GE-Proton is not installed on the PC (both compatibilitytools.d folders empty) [V 23 Oct 2026].
 - Removed: anything containing `gamescope` (the stopgap).
 - Never set: `PROTON_USE_WINED3D` (OpenGL path, slower) [P 42], `LD_PRELOAD` hacks, anything that injects. Proton's documented variables do not change the prefix [P 42], so launch option experiments are fully reversible by rewriting the string.
 
 ### 1.7 DLSS under Proton on the NVIDIA proprietary driver (checked 23 Oct 2026)
 - Policy: native first, DLSS Quality only when no native rung reaches the goal (DESIGN.md 8.2a).
+- Proton in use [V 23 Oct 2026]: "Proton - Experimental" (prefix version file `11.0-100`, build `experimental-11.0-20261014`), chosen by Steam's default: config.vdf has no CompatToolMapping entry for 230410. Proton 11 is newer than 9, so DXVK-NVAPI is on and nothing is added to the launch options. Also installed: Proton EasyAntiCheat Runtime. `gopt show warframe` prints all of this.
 - Proton 9.0 and newer ship DXVK-NVAPI and enable it by default for all titles except a short list [P 45]; Warframe (230410) is not on the `disablenvapi` list in the Proton 10 launcher script [P 44]. Older Proton needed `PROTON_ENABLE_NVAPI=1`; the plan prints this only when the mapped Proton is older than 9.
 - DLSS also needs `nvngx.dll` and `_nvngx.dll` in the prefix's system32. Proton copies both from the driver's `nvidia/wine` folder next to `libGLX_nvidia.so.0` when NVAPI is on [P 44, P 46]. On Bazzite that folder is expected at `/usr/lib64/nvidia/wine/` [U].
 - DXVK-NVAPI supports DLSS on D3D11 and D3D12 and needs a Turing or newer GPU on the proprietary driver [P 45]: the RTX 3070 (Ampere) qualifies. DLSS 1.x is not supported under Proton [P 46]; Warframe's DLSS is 2.x or newer [U].
@@ -77,7 +79,7 @@ Three heavy, repeatable Captura scenes are offered on the first run (Matthew pic
 ### 2.1 Where things live
 - Video settings: `{userdata}/730/local/cfg/cs2_video.txt`, with a game written `cs2_video.bak` beside it [S 14]. Steam KeyValues text. Keys from a real file [P 15]. Changing settings in game rewrites the file; `-autoconfig` or deleting it resets to defaults [S 16].
 - Binary: `game/bin/linuxsteamrt64/cs2` [S 29]. Native Vulkan; no `-vulkan` flag is needed on the Linux build (the flag advice found is from a 2020 Proton era post) [S 52].
-- Console log for the benchmark map's printout: `-condebug` appends to `console.log` [S 28]; CS2 Linux path [U] (expected under `game/csgo/`).
+- Console log for the benchmark map's printout: `-condebug` appends to `console.log` [S 28]; CS2 Linux path expected at `<install>/game/csgo/console.log` (CS2 is native: the `cs2` ELF in game/bin/linuxsteamrt64 [V 23 Oct 2026]); the file does not exist until CS2 runs once with `-condebug` [V 23 Oct 2026], so the path stays [U] until then.
 
 ### 2.2 Table C1: cs2_video.txt keys and initial costs
 Numeric level meanings marked [U] are confirmed by `discover` (change one menu option, diff the file).
@@ -186,15 +188,15 @@ Garry's Mod is usually CPU bound; the community fix is multicore rendering (`gmo
 - VSync and fps cap keys quoted in forums belong to Risk of Rain 2, a different game, and are not used [S 80].
 
 ## 8. Verification list for Milestone 0 (on the PC, read only)
-1. `cat` EE.cfg and record every Graphics.* key present; run `gopt discover warframe` for the [U] rows in W1.
+1. Done 23 Oct 2026 (ten Graphics keys, see 1.1). Still to do: `gopt discover warframe` for the absent rows in W1 and the Upscaling Off value.
 2. Open the Warframe launcher, switch Graphics API, quit, diff EE.cfg: find the API and Engine keys.
 3. `cat` cs2_video.txt; run `gopt discover cs2` for the numeric mappings in C1.
-4. Read localconfig.vdf: confirm the top level key and the `LaunchOptions` key under `apps/230410` and `apps/730`.
+4. Done 23 Oct 2026: top key `UserLocalConfigStore`, LaunchOptions at Software/Valve/Steam/apps/230410 (line 587). An earlier plain string "230410" (line 373, a binary blob) is skipped by the parser, which only walks blocks on the way down.
 5. `mangohud --version`; one 20 s manual log with `log_interval=50`; confirm the columns match P2.
 6. `ps -eo comm,args | grep -i -E "warframe|launcher|cs2"` while each game runs: confirm process names.
-7. Launch CS2 with `-condebug`, find `console.log`.
-8. `kscreen-doctor -o` and `kscreen-doctor --json`: confirm the JSON flag exists on Plasma 6.7.5.
-9. `ls steamapps/compatdata/230410/` for a `version` file; read `config/config.vdf` CompatToolMapping for 230410.
+7. Launch CS2 with `-condebug`, find `console.log` (not run yet: no file on 23 Oct 2026).
+8. Done 23 Oct 2026: `kscreen-doctor -j` (and `--json`) works; top level keys features, outputs, screen, tabletModeAvailable, tabletModeEngaged; DP-2 mode 34 3840x2160@240 scale 1.5, HDMI-A-1 mode 7 2560x1440@144 scale 1; `hdr` is a per output bool.
+9. Done 23 Oct 2026: version `11.0-100`, Proton Experimental, no CompatToolMapping entry, no GE-Proton (1.7).
 10. New adapters: `gopt show` for each; `gopt discover borderlands3`; `gopt find-settings riskofrainreturns` and `gopt find-settings brotato` (change the fps cap once); `ps` while each runs for process names.
 
 ## Sources

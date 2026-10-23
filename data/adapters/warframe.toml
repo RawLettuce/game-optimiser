@@ -14,6 +14,27 @@ headroom = 1.25
 path = "{compatdata}/pfx/drive_c/users/steamuser/AppData/Local/Warframe/EE.cfg"
 format = "eecfg"
 status = "S"
+# On the PC, 23 Oct 2026 [V]: section [Windows_Config,/EE/Types/Base/Config] holds only ten Graphics keys:
+# WindowMode, FullScreenSizeX/Y, UpscaleMethod, UpscaleQuality, UpscaleSharpening, AutoDetectGraphicsSettings,
+# EnableMotionBlur, HLODDistanceScale, ImposterDistanceScale. The game writes a key only once it is changed
+# in game, so every other key below waits for `gopt discover warframe` (Adapter.needs_discover).
+
+# Shown by `gopt show warframe`, never written.
+[[info_keys]]
+key = "Graphics.WindowMode"
+label = "Display mode"
+
+[[info_keys]]
+key = "Graphics.FullScreenSizeX"
+label = "Resolution width"
+
+[[info_keys]]
+key = "Graphics.FullScreenSizeY"
+label = "Resolution height"
+
+[[info_keys]]
+key = "Graphics.UpscaleSharpening"
+label = "Upscale sharpening"
 
 [launch_options]
 remove_patterns = ["gamescope"]
@@ -23,7 +44,7 @@ forbid = ["PROTON_USE_WINED3D", "-high", "LD_PRELOAD", "--force-grab-cursor"]
 # Printed with every plan. Target: native borderless on the AGON, no Gamescope (its --force-grab-cursor kept the
 # cursor grabbed, seen on the PC 23 Oct 2026). Warframe opened on the LG that night: a KWin rule pins it to DP-2.
 advice = [
-  "Display Mode: Options > Display > Display Mode = Borderless Fullscreen, Resolution 3840x2160 (no Gamescope: the cursor is free to leave the game)",
+  "Display Mode: already Borderless Fullscreen at 3840x2160 (EE.cfg WindowMode=MODE_BORDERLESS, PC, 23 Oct 2026); keep it once Gamescope is gone from the launch options (the cursor is then free to leave the game)",
   "KWin rule (once): System Settings > Window Management > Window Rules > Add New. Window class (application): Substring Match 'steam_app_230410' (check with Detect Window Properties while Warframe runs). Add Property > Screen: Force, pick the AGON (DP-2). Apply.",
   "If borderless still loses keyboard focus at 150% scaling: try Display Mode = Fullscreen next (DESIGN.md section 10, E1b), then the Wayland driver (E3)",
 ]
@@ -32,37 +53,43 @@ advice = [
 [[run_overrides]]
 key = "Graphics.AutoDetectGraphicsSettings"
 value = "0"
-status = "S"
+status = "V"   # in EE.cfg on the PC, 23 Oct 2026
 why = "stops the game re-detecting and overwriting edited settings on launch"
 restore = false
 
 [[run_overrides]]
 key = "Graphics.MaxFramerate"
 value = "0"
-status = "U"
+status = "U"   # not in EE.cfg on the PC, 23 Oct 2026: done by hand until discover finds the key
 why = "the fps cap must be off while measuring"
 manual = "Options > Display > Max Framerate: set to the maximum (uncapped) for the tuning runs"
 
 [[run_overrides]]
 key = "Graphics.VSync"
 value = "0"
-status = "U"
+status = "U"   # not in EE.cfg on the PC, 23 Oct 2026
 why = "VSync must be off while measuring"
 manual = "Options > Display > Vertical Sync: Off for the tuning runs"
 
 [[settings]]
 id = "upscaling"
 label = "Upscaling"
-key = "Graphics.Upscaling"
-levels = ["DLSS_PERFORMANCE", "DLSS_BALANCED", "DLSS_QUALITY", "OFF"]
-labels = ["DLSS Performance", "DLSS Balanced", "DLSS Quality", "Off (native)"]
-cost = [1.00, 1.18, 1.42, 1.82]
+# Real keys (EE.cfg on the PC, 23 Oct 2026 [V]): Graphics.UpscaleMethod=UM_DLSS with Graphics.UpscaleQuality=UQ_QUALITY.
+# There is no Graphics.Upscaling key. Only two levels: native, or DLSS Quality as the fallback (Matthew, 23 Oct 2026).
+key = "Graphics.UpscaleMethod"
+levels = ["UM_DLSS", "UM_NONE"]
+labels = ["DLSS Quality", "Off (native)"]
+extra_keys = { "Graphics.UpscaleQuality" = ["UQ_QUALITY", ""] }
+cost = [1.00, 1.28]
 cpu = false
 visual = 3
 upscaling = true
 # Native first; DLSS Quality only when no native rung reaches the goal (Matthew, 23 Oct 2026).
 # Proton 9+ enables DXVK-NVAPI by default and copies nvngx.dll into the prefix (ADAPTERS-RESEARCH.md 1.7).
-fallback = "DLSS_QUALITY"
+fallback = "UM_DLSS"
+# UM_DLSS and UQ_QUALITY are [V]; the native value UM_NONE has no source, so nothing is written until
+# `gopt discover warframe` records what the game writes for Upscaling Off.
+guess = true
 status = "U"
 
 [[settings]]

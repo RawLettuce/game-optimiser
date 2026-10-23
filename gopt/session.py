@@ -103,11 +103,14 @@ class Session:
         goal_fps, low_ratio, res, why = parse_goal(goal, priority, refresh_hz)
         spath = self.settings_path_or_none()
         values = self.ad.read_settings(spath)
-        usable = [s for s in self.ad.settings if s.usable]
+        waiting = [s for s in self.ad.settings if self.ad.needs_discover(s, values, spath)]
+        usable = [s for s in self.ad.settings if s not in waiting]
         levels = self.ad.current_levels(values)
         pin_levels = {}
         for sid, val in (pins or {}).items():
             s = self.ad.setting(sid)
+            if s in waiting:
+                raise Refusal(f"pin {sid}: its key is not verified yet; run `gopt discover {self.ad.id}` first")
             lv = s.level_of(val)
             if lv is None:
                 try:
@@ -136,9 +139,9 @@ class Session:
         if len(phases) > 1 and "DLSS" in phases[-1]["name"]:
             app = self.steam.app(self.ad.appid)
             warnings.append(dlss_note((app.compat_tool if app else None) or self.steam.proton_version(self.ad.appid)))
-        guessed = [s.id for s in self.ad.settings if not s.usable]
-        if guessed:
-            warnings.append(f"left out until `gopt discover {self.ad.id}` confirms their keys on the PC: {', '.join(guessed)}")
+        if waiting:
+            warnings.append(f"left out until `gopt discover {self.ad.id}` confirms their keys on the PC "
+                            f"(guessed, or not in the settings file yet): {', '.join(s.id for s in waiting)}")
         if spath is None:
             warnings.append(f"measure only: {self.ad.settings_note or 'settings file unknown'}; "
                             f"`gopt find-settings {self.ad.id}` locates it")
@@ -529,15 +532,20 @@ class Session:
 
     def record_discovery(self, setting_id: str, label: str, diff: dict) -> dict:
         """Record one discovered (setting, label) -> (key, value) and update the learned file."""
-        if len(diff) != 1:
-            raise Refusal(f"expected exactly one changed key, saw {len(diff)}: {sorted(diff)}; change one option at a time")
-        key, (old, new) = next(iter(diff.items()))
+        s = self.ad.setting(setting_id)
+        # a setting's companion keys may change with it (Warframe: UpscaleQuality with UpscaleMethod)
+        companions = {k.lower() for k in s.extra_keys}
+        main = {k: v for k, v in diff.items() if k.lower() not in companions}
+        if len(main) != 1:
+            raise Refusal(f"expected exactly one changed key, saw {len(main)}: {sorted(main)}; change one option at a time")
+        key, (old, new) = next(iter(main.items()))
+        if new is None:
+            raise Refusal(f"{key} disappeared from the file; the game rewrote it, try that option again")
         data = dict(self.ad.learned)
         disc = data.setdefault("discover", {}).setdefault(setting_id, {"key": key, "values": {}})
         if disc["key"] != key:
             raise Refusal(f"{setting_id} was previously mapped to {disc['key']}, now {key} changed; check the option")
         disc["values"][label] = new
-        s = self.ad.setting(setting_id)
         if set(disc["values"]) >= set(s.labels):
             data.setdefault("keys", {})[setting_id] = {"key": key, "levels": [disc["values"][l] for l in s.labels],
                                                        "status": "V", "date": time.strftime("%Y-%m-%d")}

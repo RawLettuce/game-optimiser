@@ -102,11 +102,18 @@ def _finish_modes(o: dict, modes: list[tuple[int, int, float]], current, preferr
     uniq = sorted(set((w, h, _hz(r)) for w, h, r in modes), key=lambda m: (m[0] * m[1], m[2]), reverse=True)
     o["modes"] = [_mode(*m) for m in uniq]
     o["max_mode"] = o["modes"][0] if o["modes"] else None
+    o["scaler_modes"] = []
     if current:
         w, h, r = current
         o.update(width=w, height=h, refresh_hz=_hz(r), active_mode=_mode(w, h, r))
     if preferred:
         o["preferred_mode"] = _mode(*preferred)
+        # max is the fastest mode at the native size; larger sizes go through the monitor's scaler
+        # (the LG 27GL850 offers 3840x2160@59.94 over HDMI, which the probe printed as its max, 23 Oct 2026)
+        area = preferred[0] * preferred[1]
+        native = [m for m in uniq if m[0] * m[1] <= area]
+        o["max_mode"] = _mode(*native[0]) if native else o["max_mode"]
+        o["scaler_modes"] = [_mode(*m) for m in uniq if m[0] * m[1] > area]
 
 
 MODE_RE = re.compile(r"(\d+):(\d+)x(\d+)@([\d.]+)(\*?)(!?)")

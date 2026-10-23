@@ -154,6 +154,9 @@ def test_tune_cs2_with_fixture_logs_reaches_goal_and_undo_restores(env):
 
 def test_tune_warframe_goal_not_met_exit_2_and_lowest_rung_left(env):
     s = env["steam"]
+    # upscaling joins the search only after discover has recorded the native value (made up here)
+    (env["data"] / "warframe.learned.json").write_text(json.dumps({"keys": {"upscaling": {
+        "key": "Graphics.UpscaleMethod", "levels": ["UM_DLSS", "UM_TEST_NATIVE"], "status": "V"}}}))
     logs = [str(FIX / "mangohud_warframe_gpu_bound.csv")] * 6     # ~77 fps against a goal of 90 x 1.25
     argv = ["tune", "warframe", "--goal", "3840x2160@90", "--apply"]
     for l in logs:
@@ -165,7 +168,9 @@ def test_tune_warframe_goal_not_met_exit_2_and_lowest_rung_left(env):
     assert "Graphics.AutoDetectGraphicsSettings=0" in cfg
     assert "Graphics.ShadowQuality=SQ_LOW" in cfg
     # native first, then DLSS Quality only (never Balanced or Performance), fastest measured rung left applied
-    assert "Graphics.Upscaling=DLSS_QUALITY" in cfg
+    assert "Graphics.UpscaleMethod=UM_DLSS" in cfg and "Graphics.UpscaleQuality=UQ_QUALITY" in cfg
+    assert "Graphics.Upscaling" not in cfg
+    assert "Graphics.UpscaleMethod=UM_TEST_NATIVE" in text            # the native phase wrote the learned value
     i_native, i_dlss = text.index("native rung"), text.index("trying DLSS Quality")
     assert i_native < i_dlss and "Upscaling=Off (native)" in text[:i_dlss]
     assert "DLSS Performance" not in text.split("search order")[1] and "DLSS Balanced" not in text
