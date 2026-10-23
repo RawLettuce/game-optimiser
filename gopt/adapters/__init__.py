@@ -14,6 +14,12 @@ from pathlib import Path
 from .. import Refusal
 from ..parsers.eecfg import EECfg, EECfgError
 from ..parsers.keyvalues import KeyValues, KeyValuesError
+from ..parsers.jsontext import JsonText, JsonTextError
+from ..parsers.srccfg import SrcCfg, SrcCfgError
+from ..parsers.winreg import WinReg, WinRegError
+
+PARSE_ERRORS = (EECfgError, KeyValuesError, JsonTextError, SrcCfgError, WinRegError)
+FORMATS = ("eecfg", "keyvalues", "ini", "srccfg", "json", "winreg")
 from ..safety import read_text_or_refuse
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "adapters"
@@ -39,6 +45,11 @@ class Setting:
     status: str = "U"
     vram_mb: list[int] | None = None
     fallback: str | None = None      # upscaling only: the level tried when native cannot reach the goal
+    guess: bool = False              # key name not from any source: kept out of the ladder until discover verifies it
+
+    @property
+    def usable(self) -> bool:
+        return not (self.guess and self.status != "V")
 
     @property
     def top(self) -> int:
@@ -73,8 +84,8 @@ class Adapter:
     program: str
     processes: list[str]
     headroom: float
-    settings_path_template: str
-    settings_format: str
+    settings_path_template: str | None
+    settings_format: str | None
     keyroot: str | None
     launch_remove: list[str]
     launch_prefix: str | None
@@ -86,6 +97,9 @@ class Adapter:
     benchmark: dict
     learned: dict = field(default_factory=dict)
     source: str = ""
+    create_if_missing: bool = False
+    settings_note: str = ""
+    info_keys: list[dict] = field(default_factory=list)   # shown by `gopt show`, never written
 
     # ---- loading ----------------------------------------------------
     @classmethod
@@ -96,16 +110,20 @@ class Adapter:
         with open(path, "rb") as f:
             d = tomllib.load(f)
         g = d["game"]
-        fs = d["files"]["settings"]
+        fs = d.get("files", {}).get("settings", {})
+        if fs.get("format") and fs["format"] not in FORMATS:
+            raise Refusal(f"{path}: unknown settings format {fs['format']!r}")
         lo = d.get("launch_options", {})
         settings = [Setting(**{k: v for k, v in s.items()}) for s in d.get("settings", [])]
         overrides = [Override(**o) for o in d.get("run_overrides", [])]
         ad = cls(id=g["id"], name=g["name"], appid=int(g["appid"]), runtime=g["runtime"], program=g["program"],
                  processes=list(g.get("processes", [])), headroom=float(g.get("headroom", 1.0)),
-                 settings_path_template=fs["path"], settings_format=fs["format"], keyroot=fs.get("keyroot"),
+                 settings_path_template=fs.get("path") or None, settings_format=fs.get("format"), keyroot=fs.get("keyroot"),
                  launch_remove=list(lo.get("remove_patterns", [])), launch_prefix=lo.get("ensure_prefix"),
                  launch_args=list(lo.get("ensure_args", [])), launch_forbid=list(lo.get("forbid", [])),
-                 launch_advice=list(lo.get("advice", [])), overrides=overrides, settings=settings, benchmark=d.get("benchmark", {}), source=str(path))
+                 launch_advice=list(lo.get("advice", [])), overrides=overrides, settings=settings, benchmark=d.get("benchmark", {}), source=str(path),
+                 create_if_missing=bool(fs.get("create_if_missing", False)), settings_note=fs.get("note", ""),
+                 info_keys=list(d.get("info_keys", [])))
         learned_path = path.with_suffix(".learned.json")
         if learned_path.exists():
             try:
@@ -150,8 +168,15 @@ class Adapter:
         self.learned_path().write_text(json.dumps(data, indent=2, sort_keys=True))
 
     # ---- paths --------------------------------------------------------
+    @property
+    def has_settings_file(self) -> bool:
+        return bool(self.settings_path_template)
+
     def settings_path(self, steam) -> Path:
         tpl = self.settings_path_template
+        if not tpl:
+            raise Refusal(f"{self.name}: the settings file is not known yet ({self.settings_note or 'see ADAPTERS-RESEARCH.md'}); "
+                          f"run `python3 -m gopt find-settings {self.id}` on the PC to locate it")
         values = {}
         if "{compatdata}" in tpl:
             cd = steam.compatdata(self.appid)
@@ -162,11 +187,26 @@ class Adapter:
             values["userdata"] = str(steam.userdata())
         if "{steam}" in tpl:
             values["steam"] = str(steam.root)
-        return Path(tpl.format(**values))
+        if "{install}" in tpl:
+            app = steam.app(self.appid)
+            if app is None:
+                raise Refusal(f"{self.name} (app {self.appid}) is not installed")
+            values["install"] = app.install_path
+        p = Path(tpl.format(**values))
+        if any(ch in str(p) for ch in "*?["):
+            hits = sorted(Path(p.anchor).glob(str(p.relative_to(p.anchor))))
+            if len(hits) != 1:
+                raise Refusal(f"{self.name}: settings path pattern {p} matched {len(hits)} files "
+                              f"({', '.join(map(str, hits[:4]))}); expected exactly one")
+            p = hits[0]
+        return p
 
     # ---- settings file ------------------------------------------------
-    def read_settings(self, path: Path) -> dict[str, str | None]:
-        """Current value of every adapter setting and override key (None when absent)."""
+    def read_settings(self, path: Path | None) -> dict[str, str | None]:
+        """Current value of every adapter setting and override key (None when absent, or when the
+        file does not exist yet and the adapter creates it on the first write)."""
+        if path is None or (self.create_if_missing and not Path(path).exists()):
+            return {k: None for k in [s.key for s in self.settings] + [o.key for o in self.overrides]}
         doc = self.load_doc(path)
         out = {}
         for s in self.settings:
@@ -182,27 +222,56 @@ class Adapter:
                 return EECfg(text)
             if self.settings_format == "keyvalues":
                 return KeyValues(text)
-        except (EECfgError, KeyValuesError) as e:
+            if self.settings_format == "ini":
+                return EECfg(text)
+            if self.settings_format == "srccfg":
+                return SrcCfg(text)
+            if self.settings_format == "json":
+                return JsonText(text)
+            if self.settings_format == "winreg":
+                return WinReg(text)
+        except PARSE_ERRORS as e:
             raise Refusal(f"cannot parse {path}: {e}")
         raise Refusal(f"unknown settings format {self.settings_format}")
 
     def _get(self, doc, key: str):
-        if self.settings_format == "eecfg":
-            return doc.get(key)
-        return doc.get([self.keyroot, key]) if self.keyroot else doc.get([key])
+        if self.settings_format == "ini":
+            sec, k = key.rsplit("::", 1)
+            return doc.get(k, section=sec)
+        if self.settings_format == "keyvalues":
+            return doc.get([self.keyroot, key]) if self.keyroot else doc.get([key])
+        return doc.get(key)
 
     def doc_text(self, doc) -> str:
-        return doc.text() if self.settings_format == "eecfg" else doc.text
+        return doc.text if self.settings_format == "keyvalues" else doc.text()
+
+    def flat(self, doc) -> dict[str, str]:
+        """Every key in the document (used to prove a write changed only the planned keys)."""
+        if self.settings_format == "keyvalues":
+            out = {}
+
+            def walk(node, prefix):
+                for k, v in node.items():
+                    if isinstance(v, dict):
+                        walk(v, f"{prefix}{k}/")
+                    else:
+                        out[f"{prefix}{k}"] = v
+            walk(doc.to_obj(), "")
+            return out
+        return doc.flat()
 
     def apply_changes(self, doc, changes: dict[str, str]):
         """Return a new document with the given key -> value changes."""
         for key, value in changes.items():
             try:
-                if self.settings_format == "eecfg":
-                    doc = doc.set(key, value)
-                else:
+                if self.settings_format == "keyvalues":
                     doc = doc.set([self.keyroot, key] if self.keyroot else [key], value)
-            except (EECfgError, KeyValuesError) as e:
+                elif self.settings_format == "ini":
+                    sec, k = key.rsplit("::", 1)
+                    doc = doc.set(k, value, section=sec)
+                else:
+                    doc = doc.set(key, value)
+            except PARSE_ERRORS as e:
                 raise Refusal(f"cannot set {key}: {e}")
         return doc
 

@@ -76,6 +76,15 @@ class Session:
     def settings_path(self) -> Path:
         return self.ad.settings_path(self.steam)
 
+    def settings_path_or_none(self) -> Path | None:
+        """None for a measure-only adapter whose settings file is not known yet."""
+        return self.settings_path() if self.ad.has_settings_file else None
+
+    def write_roots(self) -> list[Path]:
+        """The Steam root, every library folder (a game's own cfg folder can sit in a second library),
+        MangoHud's config folder and the tool's data folder."""
+        return self.paths.allowed_write_roots(self.steam.root) + [p for p in self.steam.libraries()]
+
     def mangohud_path(self) -> Path:
         return app_config_path(self.paths.mangohud_dir, self.ad.program, self.ad.runtime == "proton")
 
@@ -92,8 +101,9 @@ class Session:
              no_upscaling: bool = False, max_runs: int = 6, write_launch_options: bool = False,
              vram_mb: int | None = None, active_mode: str | None = None) -> dict:
         goal_fps, low_ratio, res, why = parse_goal(goal, priority, refresh_hz)
-        spath = self.settings_path()
+        spath = self.settings_path_or_none()
         values = self.ad.read_settings(spath)
+        usable = [s for s in self.ad.settings if s.usable]
         levels = self.ad.current_levels(values)
         pin_levels = {}
         for sid, val in (pins or {}).items():
@@ -107,7 +117,7 @@ class Session:
             pin_levels[sid] = lv
         vram_cap = vram_mb * 0.92 if vram_mb else None
         try:
-            phases = build_phases(self.ad.settings, pin_levels, no_upscaling, vram_cap)
+            phases = build_phases(usable, pin_levels, no_upscaling, vram_cap)
         except ValueError as e:
             raise Refusal(f"adapter {self.ad.id}: {e}")
         ladder = phases[0]["ladder"]
@@ -126,7 +136,15 @@ class Session:
         if len(phases) > 1 and "DLSS" in phases[-1]["name"]:
             app = self.steam.app(self.ad.appid)
             warnings.append(dlss_note((app.compat_tool if app else None) or self.steam.proton_version(self.ad.appid)))
-        unknown = [s.id for s in self.ad.settings if levels.get(s.id) is None]
+        guessed = [s.id for s in self.ad.settings if not s.usable]
+        if guessed:
+            warnings.append(f"left out until `gopt discover {self.ad.id}` confirms their keys on the PC: {', '.join(guessed)}")
+        if spath is None:
+            warnings.append(f"measure only: {self.ad.settings_note or 'settings file unknown'}; "
+                            f"`gopt find-settings {self.ad.id}` locates it")
+        elif not spath.exists() and self.ad.create_if_missing:
+            warnings.append(f"{spath.name} does not exist yet; the first write creates it (a one line comment, then the keys)")
+        unknown = [s.id for s in usable if levels.get(s.id) is None]
         if unknown:
             warnings.append(f"current value unknown for: {', '.join(unknown)} (missing key or unrecognised value); "
                             f"the start rung is estimated from the known ones")
@@ -134,11 +152,11 @@ class Session:
             "version": __version__, "game": self.ad.id, "appid": self.ad.appid, "goal": why, "goal_fps": goal_fps,
             "low_ratio": low_ratio, "headroom": self.ad.headroom, "max_runs": max_runs, "no_upscaling": no_upscaling,
             "pins": pin_levels, "ladder": ladder, "start_idx": start, "phases": phases, "current_levels": levels,
-            "settings_file": str(spath), "mangohud_config": str(self.mangohud_path()),
+            "settings_file": str(spath) if spath else None, "mangohud_config": str(self.mangohud_path()),
             "launch_options_current": current_lo, "launch_options_target": target_lo, "advice": self.ad.launch_advice,
             "write_launch_options": write_launch_options, "overrides_auto": auto_over,
             "overrides_manual": [{"key": o.key, "value": o.value, "manual": o.manual, "why": o.why} for o in manual_over],
-            "fingerprints": file_fingerprints([spath] + ([self.steam.localconfig_path()] if write_launch_options else [])),
+            "fingerprints": file_fingerprints(([spath] if spath else []) + ([self.steam.localconfig_path()] if write_launch_options else [])),
             "warnings": warnings, "benchmark": self.ad.benchmark,
         }
         return plan
@@ -146,7 +164,7 @@ class Session:
     def describe_plan(self, plan: dict) -> str:
         ladder = plan["ladder"]
         lines = [f"Plan for {self.ad.name}: {plan['goal']} (headroom x{plan['headroom']}, 1% low ratio {plan['low_ratio']})",
-                 f"  settings file: {plan['settings_file']}",
+                 f"  settings file: {plan['settings_file'] or '(unknown: measure only)'}",
                  f"  ladder: {len(ladder)} rungs, start at rung {plan['start_idx']} (closest to the current settings)",
                  f"  rung {plan['start_idx']}: {describe_rung(self.ad, ladder[plan['start_idx']])}",
                  f"  launch options now: {plan['launch_options_current'] or '(none)'}",
@@ -175,19 +193,34 @@ class Session:
             return None
         self.refuse_if_game_running()
         spath = self.settings_path()
+        roots = self.write_roots()
+        if not spath.exists() and self.ad.create_if_missing:
+            # same pattern as the MangoHud config: create a comment only file, so the backup and undo have a base
+            write_file(self.run, spath, "// created by game-optimiser; safe to delete\n", "create " + spath.name, roots)
+            self.say(f"  created {spath} (undo leaves this one line comment in place)")
         doc = self.ad.load_doc(spath)
         new_doc = self.ad.apply_changes(doc, changes)
         new_text = self.ad.doc_text(new_doc)
         before = self.ad.read_settings(spath)
-        sha = write_file(self.run, spath, new_text, reason, self.paths.allowed_write_roots(self.steam.root))
+        before_all = self.ad.flat(doc)
+        sha = write_file(self.run, spath, new_text, reason, roots)
         after = self.ad.read_settings(spath)
+        after_doc = self.ad.load_doc(spath)
+        after_all = self.ad.flat(after_doc)
         changed = {k for k in set(before) | set(after) if before.get(k) != after.get(k)}
         unexpected = changed - set(changes)
-        if unexpected:
-            raise Refusal(f"write changed keys outside the plan: {sorted(unexpected)}; the backup is in {self.run.backups}")
+        # the whole file, not just the adapter's keys: Brotato's options share a file with the save progress
+        planned = {k.rsplit("::", 1)[-1].lower() for k in changes} | {k.lower() for k in changes}
+        moved = [k for k in set(before_all) | set(after_all) if before_all.get(k) != after_all.get(k)
+                 and k.lower() not in planned and k.rsplit("::", 1)[-1].lower() not in planned
+                 and k.rsplit("/", 1)[-1].lower() not in planned]
+        if unexpected or moved:
+            raise Refusal(f"write changed keys outside the plan: {sorted(unexpected or moved)[:5]}; "
+                          f"the backup is in {self.run.backups}, undo with `gopt undo {self.run.run_id}`")
         for k, v in changes.items():
-            if (after.get(k) or "").strip() != v:
-                raise Refusal(f"verification failed: {k} is {after.get(k)!r}, wanted {v!r}")
+            got = self.ad._get(after_doc, k)
+            if (got or "").strip() != v:
+                raise Refusal(f"verification failed: {k} is {got!r}, wanted {v!r}")
         self.say(f"  wrote {len(changes)} key(s) to {spath.name}: " + ", ".join(f"{k}={v}" for k, v in changes.items()))
         return sha
 
@@ -198,7 +231,7 @@ class Session:
             mp.write_text("# created by game-optimiser; safe to delete\n")
             self.say(f"  created {mp} (undo leaves this one line comment in place)")
         text = config_text(self.run.logs, duration_s)
-        write_file(self.run, mp, text, "mangohud per-app config", self.paths.allowed_write_roots(self.steam.root))
+        write_file(self.run, mp, text, "mangohud per-app config", self.write_roots())
         self.say(f"  MangoHud config written: {mp} (logs to {self.run.logs})")
 
     def _write_launch_options(self, target: str, yes: bool):
@@ -209,7 +242,7 @@ class Session:
             if ans.strip() != "YES":
                 raise Refusal("launch options not written (YES not typed)")
         old, new = self.steam.launch_options_text(self.ad.appid, target)
-        write_file(self.run, lcp, new, "launch options", self.paths.allowed_write_roots(self.steam.root), min_ratio=0.9)
+        write_file(self.run, lcp, new, "launch options", self.write_roots(), min_ratio=0.9)
         self.say(f"  launch options written: {target}")
 
     # ---- the loop -----------------------------------------------------
@@ -256,13 +289,13 @@ class Session:
                 self._phases_done.append((ph["name"], ladder, search))
                 while (idx := search.next_rung()) is not None:
                     rung = ladder[idx]
-                    values = self.ad.read_settings(self.settings_path())
+                    values = self.ad.read_settings(self.settings_path_or_none())
                     changes = dict(plan["overrides_auto"]) if self._runs_total() == 0 else {}
                     changes.update(self.ad.changes_for_rung(rung, values))
-                    if last_sha is not None and sha256_of(self.settings_path()) != last_sha:
+                    if last_sha is not None and self.ad.has_settings_file and sha256_of(self.settings_path()) != last_sha:
                         self.say("  note: the settings file changed since the tool last wrote it (the game rewrote it); re-applying")
                     sha = self._apply_changes(changes, f"{ph['name']} rung {idx}")
-                    last_sha = sha or sha256_of(self.settings_path())
+                    last_sha = sha or (sha256_of(self.settings_path()) if self.ad.has_settings_file and self.settings_path().exists() else None)
                     confirm = " (confirmation run)" if search._confirm_pending == idx else ""
                     self.say(f"\nRun {self._runs_total() + 1}/{plan['max_runs']}: {ph['name']} rung {idx}/{len(ladder) - 1}"
                              f"{confirm}\n  {describe_rung(self.ad, rung)}")
@@ -314,7 +347,7 @@ class Session:
         final = search.final_rung()
         phase = self._phases_done[-1][0] if getattr(self, "_phases_done", None) else ""
         if final is not None:
-            values = self.ad.read_settings(self.settings_path())
+            values = self.ad.read_settings(self.settings_path_or_none())
             changes = self.ad.changes_for_rung(ladder[final], values)
             if changes:
                 self.say(f"\nApplying the final rung {final}: {describe_rung(self.ad, ladder[final])}")
@@ -329,7 +362,7 @@ class Session:
                 _, n, lad, best = max(measured, key=lambda x: (x[3].metrics.avg_fps, x[0], -x[3].rung_idx))
                 self.say(f"\nGoal not met. Best measured: {n} rung {best.rung_idx} at {best.metrics.avg_fps} fps "
                          f"({describe_rung(self.ad, lad[best.rung_idx])}). Leaving it applied.")
-                values = self.ad.read_settings(self.settings_path())
+                values = self.ad.read_settings(self.settings_path_or_none())
                 ch = self.ad.changes_for_rung(lad[best.rung_idx], values)
                 if ch:
                     self._apply_changes(ch, f"best effort {n} rung {best.rung_idx}")
@@ -480,12 +513,19 @@ class Session:
         return out
 
     def snapshot(self) -> dict[str, str]:
-        doc = self.ad.load_doc(self.settings_path())
-        if self.ad.settings_format == "eecfg":
+        return self.flat_for_discover(self.ad, self.ad.load_doc(self.settings_path()))
+
+    @staticmethod
+    def flat_for_discover(ad: Adapter, doc) -> dict[str, str]:
+        """Keys in the form the adapter's settings use (EE.cfg without the section, cs2_video.txt under
+        its root block, ini and registry as section::key, json as a dotted path)."""
+        if ad.settings_format == "eecfg":
             return {k.split("::", 1)[1]: v for k, v in doc.flat().items()}
-        obj = doc.to_obj()
-        root = obj.get(self.ad.keyroot, obj) if self.ad.keyroot else obj
-        return {k: v for k, v in root.items() if isinstance(v, str)}
+        if ad.settings_format == "keyvalues":
+            obj = doc.to_obj()
+            root = obj.get(ad.keyroot, obj) if ad.keyroot else obj
+            return {k: v for k, v in root.items() if isinstance(v, str)}
+        return ad.flat(doc)
 
     def record_discovery(self, setting_id: str, label: str, diff: dict) -> dict:
         """Record one discovered (setting, label) -> (key, value) and update the learned file."""

@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "settings": {
+    "fullscreen": true,
+    "volume": 0.8,
+    "language": "en",
+    "optimize_end_waves": false
+  },
+  "progress": {
+    "characters_unlocked": ["well_rounded", "brawler"],
+    "runs_won": 12,
+    "best_wave": {"well_rounded": 20, "brawler": 14}
+  }
+}

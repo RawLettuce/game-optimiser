@@ -119,15 +119,26 @@ def cmd_games(args, paths: Paths, out) -> int:
 def cmd_show(args, paths: Paths, out) -> int:
     steam = _steam(paths)
     ad = Adapter.load(args.game)
+    if not ad.has_settings_file:
+        out(f"{ad.name}: settings file unknown ({ad.settings_note}); measure only. "
+            f"Run `python3 -m gopt find-settings {ad.id}` to locate it.")
+        out(f"launch options: {steam.get_launch_options(ad.appid) or '(none)'}")
+        for a in ad.launch_advice:
+            out(f"advice: {a}")
+        return 0
     sp = ad.settings_path(steam)
     vals = ad.read_settings(sp)
     out(f"{ad.name}: {sp}")
+    if ad.info_keys:
+        doc = ad.load_doc(sp)
+        for ik in ad.info_keys:
+            out(f"{'[info] ' + ik['label']:40} {ik['key'].rsplit('::', 1)[-1]:52} {ad._get(doc, ik['key'])}")
     out(f"{'setting':28} {'key':40} {'value':16} level            status")
     for s in ad.settings:
         v = vals.get(s.key)
         lv = s.level_of(v)
         label = s.labels[lv] if lv is not None else ("absent (default)" if v is None else "unrecognised")
-        out(f"{s.label:28} {s.key:40} {str(v):16} {label:16} {s.status}")
+        out(f"{s.label:28} {s.key:40} {str(v):16} {label:16} {s.status}{' (guessed key: not tuned until discover)' if not s.usable else ''}")
     for o in ad.overrides:
         out(f"{'[override] ' + o.key:69} {str(vals.get(o.key)):16} wanted {o.value:9} {o.status}")
     out(f"launch options: {steam.get_launch_options(ad.appid) or '(none)'}")
@@ -214,20 +225,15 @@ def cmd_discover(args, paths: Paths, out) -> int:
     sess = Session(ad, steam, paths, out=out)
     if args.before and args.after:
         # non interactive: two saved copies of the settings file
-        from .parsers.eecfg import EECfg
-        from .parsers.keyvalues import KeyValues
-
         def flat(path):
-            text = Path(path).read_text()
-            if ad.settings_format == "eecfg":
-                return {k.split("::", 1)[1]: v for k, v in EECfg(text).flat().items()}
-            obj = KeyValues(text).to_obj()
-            root = obj.get(ad.keyroot, obj) if ad.keyroot else obj
-            return {k: v for k, v in root.items() if isinstance(v, str)}
+            return Session.flat_for_discover(ad, ad.load_doc(Path(path)))
         diff = Session.discover_diff(flat(args.before), flat(args.after))
         data = sess.record_discovery(args.setting, args.label, diff)
         out(json.dumps(data.get("discover", {}).get(args.setting), indent=2))
         return 0
+    if not ad.settings:
+        raise Refusal(f"{ad.name} has no settings to discover yet; `python3 -m gopt find-settings {ad.id}` shows which "
+                      f"file an in game change touches")
     sess.refuse_if_game_running()
     out(f"Discovery for {ad.name}. For each option: change exactly that option in the game's menu, quit the game fully, press Enter.")
     for s in ad.settings:
@@ -255,6 +261,45 @@ def cmd_discover(args, paths: Paths, out) -> int:
     return 0
 
 
+def cmd_find_settings(args, paths: Paths, out) -> int:
+    """Read only: which file and lines change when one option is changed in game."""
+    from . import findsettings as fs
+    steam = _steam(paths)
+    if args.game.isdigit():
+        appid, name = int(args.game), args.game
+    else:
+        ad = Adapter.load(args.game)
+        appid, name = ad.appid, ad.id
+    if args.before and args.after:
+        before, after = fs.load(args.before), fs.load(args.after)
+    else:
+        procs = Steam.running_processes()
+        roots = fs.roots_for(steam, appid)
+        if not roots:
+            raise Refusal(f"app {appid}: no prefix, install folder or userdata folder found")
+        out("Looking in:\n  " + "\n  ".join(map(str, roots)))
+        before = fs.snapshot(roots)
+        out(f"{len(before)} files recorded. Start the game, change exactly ONE option in its settings menu, "
+            f"quit the game fully, then press Enter.")
+        input("Press Enter when the game is closed... ")
+        after = fs.snapshot(roots)
+    changes = fs.diff(before, after)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    report = paths.data_dir / "find-settings" / f"{name}-{stamp}.txt"
+    lines = [f"game-optimiser {__version__} find-settings {name} (app {appid}) {stamp}"]
+    if not changes:
+        lines.append("no file changed (the option was already at that value, or the game saves on a later exit)")
+    for ch in changes:
+        lines.append(f"{ch['kind']}: {ch['path']}")
+        lines += [f"    {ln}" for ln in ch["lines"]]
+    for ln in lines:
+        out(ln)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("\n".join(lines) + "\n")
+    out(f"saved to {report}")
+    return 0 if changes else 4
+
+
 def cmd_selftest(args, paths: Paths, out) -> int:
     """Stdlib only smoke test over the bundled fixtures (the full suite needs pytest)."""
     from .parsers.eecfg import EECfg
@@ -270,6 +315,19 @@ def cmd_selftest(args, paths: Paths, out) -> int:
     t = (fix / "EE.cfg").read_text(newline="")
     assert EECfg(t).text() == t
     checks += 1
+    from .parsers.jsontext import JsonText
+    from .parsers.srccfg import SrcCfg
+    from .parsers.winreg import WinReg
+    from .hwprobe import parse_kscreen, parse_kscreen_json
+    for name, cls in (("GameUserSettings.ini", EECfg), ("autoexec.cfg", SrcCfg), ("brotato_save_v2.json", JsonText),
+                      ("user.reg", WinReg)):
+        t = (fix / name).read_bytes().decode("utf-8")
+        assert cls(t).text() == t, name
+        checks += 1
+    for outs in (parse_kscreen((fix / "kscreen_doctor_o.txt").read_text()),
+                 parse_kscreen_json((fix / "kscreen_doctor_j.json").read_text())):
+        assert {o["name"]: o["active_mode"] for o in outs}["DP-2"] == "3840x2160@240"
+        checks += 1
     for name in ("mangohud_warframe_gpu_bound.csv", "mangohud_cs2_cpu_bound.csv"):
         m = compute(parse_log(fix / name)["rows"])
         assert m.frames > 100 and m.avg_fps > 0
@@ -353,6 +411,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--setting", help="setting id (see show)")
     s.add_argument("--label", help="menu label that was selected")
     s.set_defaults(fn=cmd_discover)
+
+    s = sub.add_parser("find-settings", help="read only: which file changes when you change one option in game")
+    s.add_argument("game", help="adapter id or any installed appid")
+    s.add_argument("--before", help="non interactive: snapshot JSON before the change")
+    s.add_argument("--after", help="non interactive: snapshot JSON after the change")
+    s.set_defaults(fn=cmd_find_settings)
 
     s = sub.add_parser("selftest", help="stdlib smoke test over the bundled fixtures")
     s.set_defaults(fn=cmd_selftest)

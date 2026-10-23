@@ -1,0 +1,53 @@
+# Bloons TD 6 adapter (Proton, app 960090, Unity). Sources and status tags: ADAPTERS-RESEARCH.md section 6.
+# Settings are Unity PlayerPrefs in the prefix's registry, HKCU\Software\Ninja Kiwi\BloonsTD6 [S]. The game has
+# no graphics quality options beyond screen size, full screen and a frame rate cap [S], so it measures only.
+# The registry values are read (gopt show) and never written in this version.
+
+[game]
+id = "bloonstd6"
+name = "Bloons TD 6"
+appid = 960090
+runtime = "proton"
+program = "BloonsTD6.exe"          # [U]
+processes = ["BloonsTD6.exe"]
+headroom = 1.30                    # late rounds (many bloons and projectiles) are far heavier than early ones
+
+[files.settings]
+path = "{compatdata}/pfx/user.reg"
+format = "winreg"
+status = "S"
+
+[[info_keys]]
+key = "Software\\Ninja Kiwi\\BloonsTD6::Screenmanager Resolution Width_h182942802"
+label = "Unity screen width"
+
+[[info_keys]]
+key = "Software\\Ninja Kiwi\\BloonsTD6::Screenmanager Resolution Height_h2627697771"
+label = "Unity screen height"
+
+[[info_keys]]
+key = "Software\\Ninja Kiwi\\BloonsTD6::Screenmanager Fullscreen mode_h3630240806"
+label = "Unity full screen mode"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "To force 3840x2160 borderless on the AGON without the menu, add Unity's player options after %command%: -screen-width 3840 -screen-height 2160 -window-mode borderless [S]",
+  "KWin rule if it opens on the LG: class 'steam_app_960090' (substring), Screen Force = AGON (DP-2)",
+  "The frame rate follows the monitor refresh [S]; the in game 60 fps cap must be off for the runs",
+]
+
+[benchmark]
+scene = "fixed sandbox"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Bloons TD 6 benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Same map, mode and tower layout every run (a saved Sandbox layout on one map works best).
+ 3. Send the same late round, press fast forward and Shift+F2 to start the MangoHud log.
+ 4. Quit the game fully after the log stops.
+"""

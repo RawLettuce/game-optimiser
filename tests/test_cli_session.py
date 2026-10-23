@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from gopt import Refusal
+from gopt import Refusal, __version__
 from gopt.adapters import DATA_DIR
 from gopt.cli import main
 from gopt.paths import Paths
@@ -134,7 +134,7 @@ def test_tune_cs2_with_fixture_logs_reaches_goal_and_undo_restores(env):
     assert len(run_dirs) == 1
     rd = run_dirs[0]
     report = (rd / "game-optimiser-report.txt").read_text()
-    assert report.startswith("game-optimiser 0.1.0 report")
+    assert report.startswith(f"game-optimiser {__version__} report")
     assert "undo: python3 -m gopt undo" in report
     manifest = json.loads((rd / "MANIFEST.json").read_text())
     originals = {e["original"] for e in manifest["entries"]}

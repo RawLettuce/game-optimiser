@@ -61,6 +61,8 @@ def build_phases(settings: list[Setting], pins: dict[str, int] | None = None, no
     no native rung reaches the goal. Without an unpinned upscaler with a fallback there is one phase."""
     pins = dict(pins or {})
     ups = [s for s in settings if s.upscaling and s.id not in pins]
+    if not settings:
+        return [{"name": "measure only", "ladder": [{}]}]
     if no_upscaling or not ups or not all(s.fallback for s in ups):
         return [{"name": "native" if no_upscaling else "all settings",
                  "ladder": build_ladder(settings, pins, no_upscaling, vram_cap_mb)}]

@@ -121,7 +121,71 @@ Workshop map 3240880604 "CS2 FPS BENCHMARK DUST2" by Angel: automated flythrough
 - Not added by the tool: `-high`, `-threads`, `+fps_max` (use the in game cap), `-vulkan` (native build is Vulkan already) [S 52], `-autoconfig` (resets settings) [S 16], any `LD_PRELOAD` [S 59].
 - VAC: only config files and standard Steam launch options are touched; no injection, no memory access. The MangoHud wrapper is removed after tuning by default.
 
-## 3. Verification list for Milestone 0 (on the PC, read only)
+## 3. Borderlands 3 (Proton, app 397540), added 23 Oct 2026
+
+Chosen with the four below as the five most recently played games without an adapter (library listing from the PC, 23 Oct 2026: Wallpaper Engine 22 Oct is not a game and was skipped; then Borderlands 3 8 Oct, Garry's Mod 6 Oct, Brotato 14 Jul, Bloons TD 6 21 Jun, Risk of Rain Returns 10 Jun).
+
+### 3.1 Where things live
+- Settings: `Documents/My Games/Borderlands 3/Saved/Config/WindowsNoEditor/GameUserSettings.ini` [S 64], inside the prefix `{compatdata}/pfx/drive_c/users/steamuser/` (Proton's user is always steamuser [S 68]). Unreal Engine 4 ini: `[Section]` headers and `Key=Value`, written by the engine with CRLF [U]; parsed by the EE.cfg parser in "ini" mode with keys written `Section::Key`.
+- Known keys in that file: ResolutionSizeX/Y, LastUserConfirmedResolutionSizeX/Y, FullscreenMode [S 64]. Unreal's own scalability keys (`[ScalabilityGroups] sg.ShadowQuality` and friends, 0..4 from low to cinematic [S 65]) are expected; the Borderlands specific options (Volumetric Fog, Screen Space Reflections, Material Quality) have unknown keys.
+- Every setting key in `borderlands3.toml` is therefore `guess = true`: kept out of the ladder, never written, until `gopt discover borderlands3` maps it on the PC. Until then the adapter measures only.
+- Executable folder `OakGame/Binaries/Win64` [S 68]; process names [U].
+
+### 3.2 Table B1: settings and costs (Ultra baseline)
+| Menu option | Reported effect | Cost used (Very Low to Ultra) | Basis |
+|---|---|---|---|
+| Volumetric Fog | Off gives about 24 percent more fps; the biggest single cost [S 61]. Medium about 22 percent, Off a further 5 percent [S 60]; about 25 percent Off vs Ultra [S 62] | 1.00, 1.04, 1.08, 1.20, 1.33 | measured percentages, shape interpolated |
+| Screen Space Reflections | significant, gains at Medium with almost no visual loss [S 60] | 1.00, 1.02, 1.04, 1.10, 1.14 | estimate from the qualitative rank |
+| Material Quality | the only other setting with a significant effect [S 61]; Low or Medium recommended [S 63] | 1.00, 1.03, 1.06, 1.10, 1.14 | estimate |
+| Shadows | no measured source | 1.00, 1.02, 1.05, 1.08, 1.11 | estimate |
+| Foliage Detail | one guide calls it very large [S 63], others do not mention it | 1.00, 1.02, 1.04, 1.07, 1.10 | estimate, conflicting sources |
+| Texture Streaming | trivial fps cost, big quality loss at Medium and Low [S 60] | 1.00, 1.00, 1.01, 1.01, 1.02 | VRAM capped like the other games |
+| Character Detail | trivial [S 60] (another guide disagrees [S 63]) | not in the ladder | |
+| Anti-Aliasing | no measured source | 1.00 to 1.04 | estimate |
+| Graphics API | DX12 20 to 30 percent faster at very low to medium, 5 to 8 percent at high and ultra [S 61]; DX12 compiles shaders 2 to 3 minutes at start [S 67] | manual choice, DX11 first under Proton | |
+
+### 3.3 Benchmark
+Built in benchmark in the options menu (exact menu path [U]); about 105 s, representative of play [S 66]; it writes its own frame time files, cannot be started from the command line and resets to default settings when it sees new hardware [S 66]. MangoHud is the primary measurement as for the other games.
+
+## 4. Garry's Mod (app 4000), added 23 Oct 2026
+
+### 4.1 Where things live
+- Config folder `<game>/garrysmod/cfg/` [S 70]. The game runs `autoexec.cfg` at start [S 69]; the adapter owns that file (creates it with a comment line when missing, then writes `cvar "value"` lines). Source engine cfg syntax: one command per line, `//` comments, the last assignment wins. A new lossless parser (`srccfg`) keeps every other line untouched.
+- Runtime: the library showed Proton [V 23 Oct 2026]; ProtonDB reports mixed results for native vs Proton [S 73]. The new runtime detection reports which one is installed. Process names and the MangoHud per app config name [U] (x86-64 branch `bin/win64/gmod.exe`, main branch `hl2.exe`).
+
+### 4.2 Table G1: console variables
+All are standard Source cvars; costs are estimates (no measured Garry's Mod source was found), MSAA shape from CS2's table.
+| Menu option | cvar | Levels low to high | Cost |
+|---|---|---|---|
+| Antialiasing Mode | mat_antialias | 0, 2, 4, 8 | 1.00, 1.06, 1.12, 1.22 |
+| Shadow Detail | r_shadows | 0, 1 | 1.00, 1.05 |
+| Model Detail | r_rootlod | 2, 1, 0 | 1.00, 1.03, 1.06 |
+| Texture Detail | mat_picmip | 2, 1, 0, -1 | 1.00 to 1.03 (VRAM) |
+| High Dynamic Range | mat_hdr_level | 0, 1, 2 | 1.00, 1.03, 1.06 |
+| Filtering Mode | mat_forceaniso | 1, 2, 4, 8, 16 | 1.00 to 1.01 |
+| (run override) | fps_max | 0 while measuring | |
+
+Garry's Mod is usually CPU bound; the community fix is multicore rendering (`gmod_mcore_test 1`, `mat_queue_mode 2`), reported as a large gain but unstable on some systems [S 71]. The tool prints it as advice and does not set it.
+
+### 4.3 Benchmark
+`record gopt_bench` once on gm_construct, then `timedemo gopt_bench` each run: the same frames every time; timedemo prints the average and can write a stats file; VSync off and a high fps_max help [S 72]. It may not match real play [S 72], hence headroom 1.0 and the free play calibration as for Warframe.
+
+## 5. Brotato (Proton, app 1942280), added 23 Oct 2026
+- Options are stored in `save_v2.json` in `%APPDATA%/Brotato/<steam id>/` next to the save progress (a `fullscreen` true or false key is documented) [S 74]; players advise turning Steam Cloud off before editing [S 74]. Under Proton: `{compatdata}/pfx/drive_c/users/steamuser/AppData/Roaming/Brotato/*/save_v2.json`. The path pattern must match exactly one folder or the tool refuses.
+- Options with a performance angle: Optimize End Waves (speeds up the material pickup at the end of a wave; added as a crash fix in 0.6.1.6) [S 75]; a frame rate cap and resolution [S 76, third party guide]. No setting with a measured fps cost: the adapter measures only.
+- Safety: a new JSON editor changes one existing scalar in place (never adds keys) and the session now compares the whole file before and after each write, so a write that touched the progress is refused and undone by the backup.
+- Benchmark: a fixed early run (same character, weapon, Danger 0), waves 1 to 3; late waves are far heavier, so headroom is 1.3 and `measure --free-play` calibrates it.
+
+## 6. Bloons TD 6 (Proton, app 960090, Unity), added 23 Oct 2026
+- Settings are in the registry `HKEY_CURRENT_USER\SOFTWARE\Ninja Kiwi\BloonsTD6` [S 77], which under Proton is the prefix's `user.reg` (Wine's text registry). Unity names PlayerPrefs values `<name>_h<hash>`; the hash (djb2 with xor) reproduces the well known `Screenmanager Resolution Width_h182942802`, `..._Height_h2627697771` and `Screenmanager Fullscreen mode_h3630240806` (computed here, matches the names seen in Unity games [S]).
+- Options: screen size, full screen and a 60 fps cap checkbox in the settings menu [S 78]; the frame rate otherwise follows the monitor refresh [S 77]. No graphics quality options, so the adapter measures only and `gopt show bloonstd6` reads the three Unity screen values. The registry is never written in this version (a new lossless reader exists, and it only edits existing dwords).
+- Launch options: Unity player arguments `-screen-width 3840 -screen-height 2160` and `-window-mode borderless` force the mode [S 79]; printed as advice, not added automatically.
+
+## 7. Risk of Rain Returns (Proton, app 1337520, GameMaker), added 23 Oct 2026
+- Config folder `%APPDATA%\Risk_of_Rain_Returns\user_<id>` inside the prefix [S 80]; a player reports that folder holds only settings [S 81]. Saves are separate (`userdata/<id>/1337520/remote`) [S 80]. The file name and format inside `user_<id>` are not documented anywhere reachable: the adapter measures only until `gopt find-settings riskofrainreturns` names the file on the PC.
+- VSync and fps cap keys quoted in forums belong to Risk of Rain 2, a different game, and are not used [S 80].
+
+## 8. Verification list for Milestone 0 (on the PC, read only)
 1. `cat` EE.cfg and record every Graphics.* key present; run `gopt discover warframe` for the [U] rows in W1.
 2. Open the Warframe launcher, switch Graphics API, quit, diff EE.cfg: find the API and Engine keys.
 3. `cat` cs2_video.txt; run `gopt discover cs2` for the numeric mappings in C1.
@@ -131,6 +195,7 @@ Workshop map 3240880604 "CS2 FPS BENCHMARK DUST2" by Angel: automated flythrough
 7. Launch CS2 with `-condebug`, find `console.log`.
 8. `kscreen-doctor -o` and `kscreen-doctor --json`: confirm the JSON flag exists on Plasma 6.7.5.
 9. `ls steamapps/compatdata/230410/` for a `version` file; read `config/config.vdf` CompatToolMapping for 230410.
+10. New adapters: `gopt show` for each; `gopt discover borderlands3`; `gopt find-settings riskofrainreturns` and `gopt find-settings brotato` (change the fps cap once); `ps` while each runs for process names.
 
 ## Sources
 P1, P2, P3, P15, P42, P44 to P51 as in DESIGN.md.
@@ -151,3 +216,25 @@ P1, P2, P3, P15, P42, P44 to P51 as in DESIGN.md.
 - S57 Steam guide mapping setting.gpu_level to shader quality 0..3, steamcommunity.com/sharedfiles/filedetails/?id=3307464347.
 - S58 PC Games Hardware, Counter-Strike 2 Benchmarks und Fazit, pcgameshardware.de (CS2 light on CPU).
 - S59 Steam Community CS2 thread on an LD_PRELOAD launch line for input lag (anecdotal; not adopted), steamcommunity.com/app/730/discussions/0/594020536868179202.
+- S60 Steam guide, Squeezing out those fps: Graphics Optimization for BL3, steamcommunity.com/sharedfiles/filedetails/?id=2026910275.
+- S61 PC Gamer, Borderlands 3 system requirements, settings, benchmarks and performance analysis, pcgamer.com/borderlands-3-system-requirements-settings-benchmarks-and-performance-analysis/.
+- S62 Logical Increments, Building the best PC for Borderlands 3, logicalincrements.com/games/build-pc-borderlands-3.
+- S63 bestsettings.com, Best settings for Borderlands 3, bestsettings.com/guides/best-settings-for-borderlands-3/.
+- S64 Steam Community Borderlands 3 thread on GameUserSettings.ini, steamcommunity.com/app/397540/discussions/0/2447091790574686245/.
+- S65 Unreal Engine 4.27 API, UGameUserSettings::SetShadowQuality, docs.unrealengine.com/4.27/en-US/API/Runtime/Engine/GameFramework/UGameUserSettings/SetShadowQuality/.
+- S66 AnandTech CPU Overload project, Borderlands 3 page (benchmark output, reset on new hardware, no command line), anandtech.com/show/11425; Wccftech Borderlands 3 PC performance explored (105 s run), wccftech.com/borderlands-3-pc-performance-explored-the-quintessential-looter-shooter-for-your-computer/.
+- S67 Techgage, Borderlands 3 1080p, 1440p, 4K and ultrawide benchmarks, DX11 vs DX12, techgage.com/print/borderlands-3-graphics-card-benchmarking.
+- S68 Level1Techs forum, Borderlands 3 Wine gaming on Linux troubleshooting, forum.level1techs.com/t/borderlands-3-wine-gaming-on-linux-troubleshooting/154989; steamtinkerlaunch wiki SteamUser (Proton's steamuser), github.com/frostworx/steamtinkerlaunch/wiki/SteamUser.
+- S69 Steam Community Garry's Mod threads on autoexec.cfg and config.cfg, steamcommunity.com/app/4000/discussions/1/828937979401312015/ and /864970668153013943.
+- S70 PCGamingWiki, Garry's Mod (config in <game>/garrysmod/cfg/), pcgamingwiki.com/wiki/Garry's_Mod.
+- S71 Garry's Mod fps guides: steamcommunity.com/sharedfiles/filedetails/?id=1282254845 and catalogue.smods.ru/archives/245387 (gmod_mcore_test, mat_queue_mode, instability warning).
+- S72 Valve Developer Community, Timedemo, developer.valvesoftware.com/wiki/Timedemo.
+- S73 ProtonDB, Garry's Mod, protondb.com/app/4000.
+- S74 Steam Community Brotato threads on save_v2.json and its fullscreen key, steamcommunity.com/app/1942280/discussions/0/3389546760554391703 and /5822622429924303735.
+- S75 Steam Community, What does Optimize End of Wave do?, steamcommunity.com/app/1942280/discussions/0/3807278817572418583/; Brotato wiki, Patch 0.6.1.6, brotato.wiki.spellsandguns.com/Patch_0.6.1.6.
+- S76 ludo.guide, Brotato performance and graphics settings, ludo.guide/guide/brotato/getting-started/troubleshooting-common-issues/performance-graphics-settings.
+- S77 PCGamingWiki, Bloons TD 6 (registry key, frame rate capped at the monitor refresh), pcgamingwiki.com/wiki/Bloons_TD_6.
+- S78 Bloons Wiki, Bloons TD 6 (settings menu: screen size, full screen, 60 fps cap), bloonswiki.com/Bloons_TD_6.
+- S79 Unity Manual, Player command line arguments (-screen-width, -screen-height, -screen-fullscreen, -window-mode exclusive or borderless), docs.unity3d.com/Manual/PlayerCommandLineArguments.html.
+- S80 PCGamingWiki, Risk of Rain Returns (config and save locations), pcgamingwiki.com/wiki/Risk_of_Rain_Returns.
+- S81 Steam Community Risk of Rain Returns thread (the user folder holds settings only), steamcommunity.com/app/1337520/discussions/0/3948028800071895323/.

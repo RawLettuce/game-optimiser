@@ -1,0 +1,16 @@
+WINE REGISTRY Version 2
+;; All keys relative to \\User\\S-1-5-21-0-0-0-1000
+
+#arch=win64
+
+[Software\\Ninja Kiwi\\BloonsTD6] 1761100000
+#time=1dc4a5b5e3c1a20
+"Screenmanager Fullscreen mode_h3630240806"=dword:00000001
+"Screenmanager Resolution Height_h2627697771"=dword:00000870
+"Screenmanager Resolution Width_h182942802"=dword:00000f00
+"unity.player_session_count_h922449978"=hex(4):05,00,00,00,00,00,00,00
+
+[Software\\Wine\\Fonts] 1761000000
+#time=1dc4a5b5e3c1a20
+"LogPixels"=dword:00000060
+"Name"="Tahoma"

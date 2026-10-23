@@ -8,11 +8,13 @@ from gopt.adapters import Adapter, DATA_DIR
 from gopt.steam import Steam
 
 
-def test_both_adapters_load_and_are_consistent():
-    assert Adapter.available() == ["cs2", "warframe"]
+def test_all_adapters_load_and_are_consistent():
+    assert Adapter.available() == ["bloonstd6", "borderlands3", "brotato", "cs2", "garrysmod", "riskofrainreturns", "warframe"]
     for game in Adapter.available():
         ad = Adapter.load(game)
-        assert ad.settings, game
+        assert ad.settings or ad.benchmark.get("instructions"), game        # measure only adapters still benchmark
+        assert ad.runtime in ("proton", "native") and ad.processes and ad.program
+        assert "gamescope" in ad.launch_remove
         for s in ad.settings:
             assert len(s.levels) == len(s.labels) == len(s.cost), s.id
             assert s.cost[0] == 1.0 and all(b >= a for a, b in zip(s.cost, s.cost[1:])), s.id

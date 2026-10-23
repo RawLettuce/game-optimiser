@@ -1,4 +1,4 @@
-# game-optimiser design (v0.1, 23 Oct 2026, design only, no code yet)
+# game-optimiser design (v0.2, 23 Oct 2026)
 
 A Linux tool that tunes a game's settings towards a goal ("3840x2160 at 90 fps") or a priority (quality, balanced, fps), the way the NVIDIA app's auto optimise does on Windows, but by editing config files and Steam launch options only and by measuring real frame logs on the real PC.
 
@@ -145,6 +145,15 @@ confirm_duration_s = 90
 
 Adapter interface (`adapters/base.py`): `locate(probe) -> paths`, `read() -> Settings`, `write(settings, plan)`, `running() -> bool`, `launch_profile(rung) -> str`, `mangohud_config(run) -> str`, `log_glob(run) -> pattern`, `discover()` (section 7.3).
 
+Additions made on 23 Oct 2026 (all optional, used by the new adapters):
+- `[files.settings]`: `format` is one of `eecfg`, `keyvalues`, `ini` (Unreal Engine, keys `Section::Key`), `srccfg` (Source engine cfg), `json` (dotted paths) or `winreg` (Wine registry, keys `Registry\Key::Value`); `path` may use `{install}` (the game folder) and a `*` pattern that must match exactly one file; `create_if_missing = true` lets the tool create a file it owns (Garry's Mod autoexec.cfg); with no `path` the adapter measures only and `note` says what is known.
+- `[[settings]]`: `fallback` names the upscaler level tried when native fails (8.2a); `guess = true` marks a key name with no source: such a setting stays out of the ladder and is never written until `discover` verifies it.
+- `[launch_options] advice`: lines printed with every plan and by `show` (display mode, KWin rule, manual steps).
+- `[[info_keys]]`: values `show` prints but the tool never writes (Bloons TD 6's Unity screen values).
+- `[[benchmark.scene_options]]`: scenes offered on the first run (9).
+
+Every write is now also checked against the whole file: the document is flattened before and after, and any key outside the plan that changed stops the run (Brotato's options share a file with the save progress).
+
 Learned costs are written to `data/adapters/<game>.learned.json` (dated, per hardware fingerprint) and override the TOML estimates on later runs. The TOML keeps the published estimates and their sources.
 
 ## 7. File formats and parsers
@@ -161,6 +170,9 @@ Steam KeyValues text. Location: `{userdata}/730/local/cfg/cs2_video.txt` (Window
 
 ### 7.3 `gopt discover <game>`: learning keys on the PC
 Because the wikis are partly unreachable from the cloud and value names drift between game versions, the adapter learns its key map empirically: the tool snapshots the settings file, asks Matthew to change exactly one named option in the game's menu and quit, then diffs the file and records `menu option -> key, old value, new value` in `data/adapters/<game>.learned.json`. One pass through the Warframe and CS2 video menus (about 15 minutes each) fills the [U] cells. This is a read only operation plus a JSON write in the tool's own data folder.
+
+### 7.3a `gopt find-settings <game|appid>`: finding an unknown settings file
+For games whose settings file is not documented (Risk of Rain Returns, the options in Brotato), the tool snapshots the likely places read only: the prefix's AppData/Local, AppData/LocalLow, AppData/Roaming, Documents and `user.reg`, the install folder and `userdata/<user>/<appid>`, skipping cache, shader and log folders, files over 4 MB (hashed by size and time only) and stopping at 30000 files. Matthew changes one option in game and quits; the tool snapshots again and prints every changed, added or removed file with the changed lines of text files, and saves the result to `~/.local/share/game-optimiser/find-settings/`. Works for any installed appid.
 
 ### 7.4 Steam localconfig.vdf
 `{userdata}/config/localconfig.vdf`, text KeyValues. Tools that set launch options walk `Software > Valve > Steam > apps > <appid>` and write `LaunchOptions` under the app [S 20]; the top level key name is [U] and is confirmed on the PC in Milestone 0 by reading the file. Steam must be closed [S 20]. A corrupted file silently resets preferences [S 20].
@@ -266,10 +278,11 @@ gopt selftest                                runs the bundled test suite on the 
 gopt show <game>                             current settings, launch options, last run and backups
 gopt discover <game>                         learn key names and values by diffing after one in game change (loop)
 gopt plan <game> --goal 3840x2160@90 | --priority quality|balanced|fps [--pin KEY=VAL]... [--no-upscaling] [--max-runs 6]
-gopt tune <game> (same options) [--apply] [--log-file CSV]... [--yes] [--write-launch-options]
+gopt tune <game> (same options) [--apply] [--log-file CSV]... [--yes] [--write-launch-options] [--scene N|name]
                                              the measure and adjust loop; dry run prints the plan and the first rung only
 gopt measure <game> [--free-play]            one logged run at current settings, metrics only, no writes except the MangoHud config
 gopt apply <plan.json> --apply               apply a saved plan (typed YES for localconfig.vdf)
+gopt find-settings <game|appid>              read only: which file and lines change after one in game change (7.3a)
 gopt undo <run-id> [--force]                 restore every file from the run's manifest, once
 gopt restore <run-id>                        alias of undo
 gopt report <run-id>                         print the report
@@ -279,7 +292,7 @@ Exit codes: 0 done, 2 goal not met (best found applied or reported), 3 refused (
 
 ## 13. Milestones
 
-Status 23 Oct 2026: milestones 1 to 5 are built and tested in the cloud (88 tests); milestone 0 still has to run on the PC, and the Warframe launch profile experiments E2 and E3 are printed as manual steps rather than automated.
+Status 23 Oct 2026 (evening): the four bugs from the first PC run are fixed, the search is native first with a DLSS Quality fallback, and five more adapters exist (Borderlands 3, Garry's Mod, Brotato, Bloons TD 6, Risk of Rain Returns); 126 tests. Earlier the same day: milestones 1 to 5 were built and tested in the cloud (88 tests); milestone 0 still has to run on the PC, and the Warframe launch profile experiments E2 and E3 are printed as manual steps rather than automated.
 
 0. Verification on the PC (no writes): read EE.cfg, cs2_video.txt and localconfig.vdf, confirm key names marked [U], confirm MangoHud version and that `log_interval=50` yields per sample rows, confirm process names, find `console.log`. Output: a dated `VERIFIED.md` and updated TOML statuses.
 1. Parsers, safety layer, probe, tests with fixtures. No game writes yet.
