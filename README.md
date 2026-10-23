@@ -22,3 +22,5 @@ Full test suite: `python3 -m pytest -q` (pytest needed; the tool itself has no d
 Supported games: Warframe (Proton, EE.cfg) and Counter-Strike 2 (native, cs2_video.txt) with full tuning; Garry's Mod (autoexec.cfg cvars) with tuning; Borderlands 3 (tuning after `discover` confirms its keys), Brotato, Bloons TD 6 and Risk of Rain Returns (measure only until their settings are found on the PC). New games are a TOML file in `data/adapters/`.
 
 Find where any game keeps a setting: `python3 -m gopt find-settings <game or appid>` (read only).
+
+How to use it, in plain English: USER-GUIDE.md. Tests run on GitHub Actions for every push and pull request (Python 3.12 to 3.14).

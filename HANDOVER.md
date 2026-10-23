@@ -82,3 +82,51 @@ python3 -m gopt undo <run-id>
 - Brotato: turn Steam Cloud off before any write to save_v2.json (none happens until keys are confirmed).
 - localconfig.vdf top level key (only for `--write-launch-options`; the default is to paste).
 - No sudo step exists; `scripts/root-steps.sh` was not created because nothing needs root.
+
+## more-adapters (23 Oct 2026, late; branch `claude/more-adapters-z901je`, based on PR #1's branch)
+
+### What this branch adds
+1. Nineteen adapters, one for every installed game that had none (Wallpaper Engine, Proton, runtimes and redistributables skipped): LEGO The Lord of the Rings, Deep Rock Galactic, Detroit, Disco Elysium, Dishonored, Hades, Hotline Miami, Lethal Company, Megabonk, Monster Hunter Stories 2, Risk of Rain 2, Slime Rancher, Tactical Breach Wizards, Terraria, The Witcher 3, Darktide, Mechanicus, Vermintide 2, XCOM 2. Each TOML has a `confidence` tag; research and sources in ADAPTERS-RESEARCH.md section 9 (S82 to S103).
+2. `tests/test_more_adapters.py` (46 tests) and five synthetic fixtures (tests/fixtures/FIXTURES.md says what they are).
+3. GitHub Actions CI (`.github/workflows/tests.yml`): the full suite plus `selftest` on Python 3.12, 3.13 and 3.14 for every push and pull request. Only pytest is installed, and only in CI.
+4. A Python 3.12 fix: `Path.read_text(newline=)` exists only from 3.13, so `selftest` and nine tests failed on 3.12; they now read bytes and decode.
+5. USER-GUIDE.md: the plain English guide (probe, library, discover, plan, tune, measure, undo, safety).
+6. Files of PR #1 touched: `gopt/cli.py` (two selftest lines), `tests/test_parsers.py` and `tests/test_new_adapters.py` (the same read change), `tests/test_adapters.py` (the adapter list check is now "the original seven are present"), ADAPTERS-RESEARCH.md (section 9, item 11 in section 8, sources), FIXTURES.md, this section. No parser, search, Warframe or CS2 code changed.
+
+### State
+- 173 passed, 1 skipped on Python 3.13 and on 3.12 (the skipped test needs a non root user; it passes as `nobody`, 174/174). `selftest` 39 checks.
+- Confidence: tunes after `discover` (file known, keys guessed): Deep Rock Galactic, The Witcher 3, XCOM 2. Measure only with the file known: Disco Elysium, Dishonored. Measure only because the format (SJSON) is unsupported: Hades, Darktide, Vermintide 2. Needs `find-settings`: the other eleven.
+
+### Exact commands for the PC (Konsole on the host, after PR #1's commands; all read only)
+```
+cd ~/Documents/game-optimiser
+git fetch origin
+git checkout claude/more-adapters-z901je
+python3 -m gopt selftest
+python3 -m gopt library --games-only
+python3 -m gopt games
+```
+Expected: `library` names an adapter on every game row except Wallpaper Engine; `games` prints no WARNING line about the runtime.
+
+Then, for each game you want to tune, after launching it once:
+```
+python3 -m gopt discover deeprockgalactic
+python3 -m gopt discover witcher3
+python3 -m gopt discover xcom2
+python3 -m gopt find-settings riskofrain2        # likewise for any "needs discover: file" game
+```
+While each new game runs: `ps -eo comm,args | grep -i <name>` and paste it back (every process name is [U]).
+
+### Next steps
+1. On the PC: the commands above; record results in VERIFIED.md and move facts from [U] to [V].
+2. Correct each adapter's `program` from the `ps` output first: MangoHud's per app config file (`wine-<program>.conf`) and the log search both use it, so a wrong name means no log.
+3. Add a `{home}` path placeholder and the native games' data folders as write roots (Terraria config.json, Unity prefs), once PR #1 has merged. Then Terraria can tune.
+4. An SJSON reader (Stingray user_settings.config for Darktide and Vermintide 2, Hades' Profile1.sjson), with lossless round trip tests like the other parsers.
+
+### Needs Matthew, his PC or a decision (skipped here)
+- The Witcher 3: DirectX 11 or 12. The adapter edits dx12user.settings (the default; a report says DirectX 12 is about half as fast under Proton and DirectX 11 is going away). If you play DirectX 11, the path changes to user.settings.
+- XCOM 2: base game or War of the Chosen (different My Games folder [U]).
+- Every [U] in ADAPTERS-RESEARCH.md section 9, above all the process names and the Disco Elysium company folder spelling.
+- Deep Rock Galactic: DirectX 11 or 12 at launch (players disagree on which is faster).
+- Steam Cloud: Disco Elysium, Slime Rancher, Tactical Breach Wizards and Darktide sync settings; turn it off for a game before any future write to its files.
+- The branch is `claude/more-adapters-z901je` (the session's assigned branch); `claude/more-adapters` on GitHub still points at PR #1's last commit.

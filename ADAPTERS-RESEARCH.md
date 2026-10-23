@@ -196,6 +196,85 @@ Garry's Mod is usually CPU bound; the community fix is multicore rendering (`gmo
 8. `kscreen-doctor -o` and `kscreen-doctor --json`: confirm the JSON flag exists on Plasma 6.7.5.
 9. `ls steamapps/compatdata/230410/` for a `version` file; read `config/config.vdf` CompatToolMapping for 230410.
 10. New adapters: `gopt show` for each; `gopt discover borderlands3`; `gopt find-settings riskofrainreturns` and `gopt find-settings brotato` (change the fps cap once); `ps` while each runs for process names.
+11. More adapters (section 9): `ps -eo comm,args` while each game runs (every process name is [U]); `gopt discover deeprockgalactic`, `gopt discover witcher3`, `gopt discover xcom2`; `gopt find-settings <game>` for each "needs discover: file" adapter after its first launch.
+
+## 9. Nineteen more adapters (23 Oct 2026, late; branch more-adapters)
+
+Every installed game without an adapter in the PC's `gopt library` listing of 23 Oct 2026, most recently played first (LEGO The Lord of the Rings, 6 Jun 2026; the rest have never been launched and are in library order). Skipped: Wallpaper Engine (not a game), the Proton, Steam Linux Runtime, EasyAntiCheat runtime and Steamworks redistributable entries, and the duplicate rows (the same library seen through /home and /var/home).
+
+Research limits: every host in CLAUDE.md's blocked list plus reddit, nexusmods, protondb, terraria.wiki.gg, gamersnexus, primagames, level1techs and vgtimes failed from the cloud container; facts below come from search engine quotations [S] unless read directly. Read directly: one real pre 4.0 Witcher 3 user.settings (S97) and the Vermintide 2 script mirror (S101).
+
+Confidence tags (the `confidence` key in each TOML `[game]` table):
+- **needs discover: keys**: the settings file is known [S], the key names are guesses (`guess = true`), nothing is written until `gopt discover <game>` confirms them on the PC. Deep Rock Galactic, The Witcher 3, XCOM 2.
+- **measure only: file known**: the file is known and readable, no key is tied to a menu option. Disco Elysium, Dishonored.
+- **measure only: format**: the file is known but its format (SJSON) is not supported. Hades, Darktide, Vermintide 2.
+- **needs discover: file**: the file is not confirmed (or sits under the home folder of a native game, where the tool does not write yet); `gopt find-settings <game>` finds it. The other eleven.
+
+Every process and executable name in these adapters is [U] (confirm with `ps` while each game runs). Every adapter adds `mangohud` and removes gamescope like the others.
+
+### 9.1 LEGO The Lord of the Rings (Proton, app 214510)
+- pcconfig.txt in `%APPDATA%\Warner Bros. Interactive Entertainment\<game>\` [S 82]; one thread names the folder `LEGOLordofTheRings`, another `LEGOTheLordoftheRings` [S 82]. It holds WindowWidth, WindowHeight, WindowLeft, WindowTop and the refresh rate; no windowed switch [S 82]. Format undocumented: needs discover.
+
+### 9.2 Deep Rock Galactic (Proton, app 548430, Unreal Engine 4)
+- GameUserSettings.ini in the install folder, `FSD/Saved/Config/WindowsNoEditor/` [S 83] (not in the prefix). Known keys there: ResolutionSizeX/Y, PreferredFullscreenMode [S 83]. Deleting it restores defaults [S 83].
+- Unreal's `[ScalabilityGroups] sg.*Quality` keys (0 Low to 3 Epic, 4 Cinematic [S 65]) are expected but no source shows them in this game's file: all six settings are `guess = true`.
+- Costs: players name shadows the biggest cost for the least visual gain, then view distance [S 84]; cave dust and particles load swarms [S 84, modelled numbers not used]; anti aliasing low when GPU bound [S 84]. DirectX 11 vs 12: players disagree [S 84]. All cost numbers are estimates.
+
+### 9.3 Detroit: Become Human (Proton, app 1222140)
+- GraphicOptions.JSON with FRAME_RATE_LIMIT in the install folder [S 85, one low quality guide]; WindowsInfo.JSON with MONITOR and DISPLAY_MODE (0 fullscreen) [S 85]. Saves in `%USERPROFILE%\Saved Games\Quantic Dream\Detroit Become Human\` [S 85]. Vulkan renderer with a pipeline cache in the install folder's ShaderCache [S 85]. File names unconfirmed (case matters on Linux): needs discover.
+
+### 9.4 Disco Elysium (Proton, app 632470, Unity)
+- Settings.json in `AppData\LocalLow\ZAUM Studio\Disco Elysium\Settings\`, editable as text, with a graphics section holding the resolution (only listed resolutions work) [S 86]. A save guide spells the company `Zaum Studio` [S 86], so the adapter path uses `LocalLow/*/Disco Elysium/...` (must match exactly one file). Steam Cloud syncs the settings with the saves [S 86]. No key is tied to a graphics option: measure only, never written.
+
+### 9.5 Dishonored (Proton, app 205100, Unreal Engine 3)
+- DishonoredEngine.ini in `Documents\My Games\Dishonored\DishonoredGame\Config` [S 87]; default ini files sit in the install folder [S 87]. Menu settings are in `userdata/<id>/205100/remote/options.sav` and the ini files hold everything else [S 87]. Players tweak MaxAnisotropy and bForceNoStartupMovies there [S 87]; their sections are [U]. `gopt show dishonored` reads both; nothing is written.
+
+### 9.6 Hades (Proton, app 1145360)
+- Profile1.sjson in `Documents\Saved Games\Hades\` holds the settings (Supergiant FAQ) [S 88]; SJSON is not supported, and the file also holds the profile. Hades II uses a different folder [S 88].
+
+### 9.7 Hotline Miami (native, app 219150)
+- SaveData.sav in `$XDG_DATA_HOME/Hotline Miami/` or `~/.local/share/Hotline Miami/` (official FAQ quoted on Steam) [S 89]; the 2013 beta used `HotlineMiami` without a space [S 89]. No settings file documented. Measure only (a light 2D game).
+
+### 9.8 Lethal Company (Proton, app 1966720, Unity)
+- Saves and LCGeneralSaveData in `AppData\LocalLow\ZeekerssRBLX\Lethal Company` [S 90]; Easy Save 3 files [S 90]. Which file holds the display options and under which keys is unknown.
+
+### 9.9 Megabonk (native per the library, app 3405340, Unity)
+- Windows saves in `AppData\LocalLow\Ved\Megabonk` [S 91]; no Linux path found. Menu options with an fps angle: shadow quality and resolution, anti aliasing x2 to x8 (x8 costs most in swarms), soft particles, bloom, motion blur, FPS limit (300 or unlimited) and VSync [S 91].
+
+### 9.10 Monster Hunter Stories 2: Wings of Ruin (Proton, app 1277400)
+- config.ini in the install folder [S 92, one low quality source]. ProtonDB lists the trial Gold [S 92]. Keys unknown.
+
+### 9.11 Risk of Rain 2 (Proton, app 632360, Unity)
+- A config file of console commands in `<install>/Risk of Rain 2_Data/Config/`, which players copy to autoexec.cfg [S 93]. `fps_max -1` is unlimited [S 93]. With VSync on players see 60 fps on 144 Hz screens [S 93]. The line format (a trailing semicolon is likely [U]) would not survive the Source cfg parser, so nothing is written.
+
+### 9.12 Slime Rancher (native, app 433340, Unity)
+- Linux: `~/.config/unity3d/Monomi Park/Slime Rancher` (2017 thread, disputed in a reply) [S 94]; Windows `AppData\LocalLow\Monomi Park\Slime Rancher` (developer confirmed) [S 94]. Steam Cloud may restore old files [S 94]. No settings file documented.
+
+### 9.13 Tactical Breach Wizards (Proton, app 1043810, Unity)
+- Saves in `AppData\LocalLow\Suspicious Developments\Tactical Breach Wizards\SaveData`; turn Steam Cloud off before copying [S 95]. Settings file unknown.
+
+### 9.14 Terraria (native, app 105600)
+- config.json in `$HOME/.local/share/Terraria` on Linux; quit the game fully before editing [S 96]. The graphics key names could not be read (the wiki is blocked here). The tool's write roots are the Steam libraries, MangoHud's folder and its own data folder, so a native game's home folder file is out of reach until a `{home}` path and write root are added (a small change to the adapter loader and safety code, left until PR #1 has merged).
+
+### 9.15 The Witcher 3: Wild Hunt (Proton, app 292030)
+- Ini style files in `Documents\The Witcher 3`: user.settings for DirectX 11, dx12user.settings for DirectX 12 [S 97]; a dx12user.settings dump shows a `[Rendering/RT/HBIL]` section [S 97]. The adapter edits dx12user.settings (the default renderer); a May 2026 report says DirectX 12 runs at about half the DirectX 11 frame rate under Proton without ray tracing and that the next update drops DirectX 11 [S 99]. Which renderer to use is Matthew's decision.
+- A real pre 4.0 user.settings [S 97, read directly] has `[Rendering] HairWorksLevel, GrassDensity, MaxTextureAnizotropy, CascadeShadowmapSize, CascadeShadowQuality`, `[PostProcess] SSAOSolution`, `[Rendering/SpeedTree] FoliageDistanceScale`, `[Engine] LimitFPS=60` and `[Viewport] VSync=true`. Tweak threads agree on the sections [S 98]: SSAOSolution 2 is HBAO+ (expensive), 1 lighter [S 98]; Ultra is GrassDensity 2400 and FoliageDistanceScale 1 [S 98].
+- Costs: HairWorks off is the first advice; Medium shadows save more than most post processing; foliage visibility and grass density cost most in forests [S 99]. No measured per setting numbers were readable (GamersNexus blocked). All six settings are `guess = true` (the keys are from the pre 4.0 file and the lower levels are estimates); a menu option that changes several keys (shadows) will need more than one key after discover. VSync and the frame cap are manual steps (their unlocked values are unknown).
+
+### 9.16 Warhammer 40,000: Darktide (Proton, app 1361210)
+- user_settings.config in `AppData\Roaming\Fatshark\Darktide` [S 100]; settings that reset on launch mean the file is read only; Steam Cloud can restore old AppData [S 100]. Fatshark staff edit `nv_framerate_cap` in it [S 100]. SJSON, not supported.
+
+### 9.17 Warhammer 40,000: Mechanicus (native, app 673880, Unity)
+- Linux data under `~/.config/unity3d/Bulw...` (cut off in the source); Windows `AppData\LocalLow\BulwarkStudios` [S 102]. Linux build officially supported since 1.1.3 [S 102].
+
+### 9.18 Warhammer: Vermintide 2 (Proton, app 552500)
+- user_settings.config in `AppData\Roaming\Fatshark\Vermintide 2` [S 100]. The game's default settings script (community mirror of the shipped scripts) has `max_fps = 0`, `vsync = true`, `dlss_enabled = false`, `fsr_enabled = false`, `fsr2_enabled = false` [S 101, read directly]. SJSON, not supported.
+
+### 9.19 XCOM 2 (Proton, app 268500, Unreal Engine 3)
+- The graphics settings are cached in `Documents\My Games\XCOM2\XComGame\Config\XComEngine.ini`; `-REGENERATEINIS` rebuilds it with default graphics [S 103]. The game tries to reset the file to defaults; players mark it read only [S 103]. The texture streaming PoolSize defaults to 10 MB and players raise it for smoothness [S 103]. The four settings use Unreal Engine 3's usual `[SystemSettings]` names [U] and are `guess = true`. War of the Chosen keeps its own folder [U].
+
+### 9.20 Tests
+`tests/test_more_adapters.py` (46 tests): every new TOML loads, has a confidence tag, unique appid and a benchmark; the library and `games` list all nineteen with the right runtime; guessed keys are never written (sha256 unchanged after plan and tune) and `show` reads them; a discovered Witcher 3 key is written with the CRLF file otherwise byte identical and `undo` restores it; discover records a `Rendering/SpeedTree::` key; file unknown adapters measure only and `discover` points at `find-settings`; the Disco Elysium glob matches either company spelling; Dishonored's info keys show; native measure only adapters write nothing under the home folder except MangoHud's per app config.
 
 ## Sources
 P1, P2, P3, P15, P42, P44 to P51 as in DESIGN.md.
@@ -238,3 +317,25 @@ P1, P2, P3, P15, P42, P44 to P51 as in DESIGN.md.
 - S79 Unity Manual, Player command line arguments (-screen-width, -screen-height, -screen-fullscreen, -window-mode exclusive or borderless), docs.unity3d.com/Manual/PlayerCommandLineArguments.html.
 - S80 PCGamingWiki, Risk of Rain Returns (config and save locations), pcgamingwiki.com/wiki/Risk_of_Rain_Returns.
 - S81 Steam Community Risk of Rain Returns thread (the user folder holds settings only), steamcommunity.com/app/1337520/discussions/0/3948028800071895323/.
+- S82 Steam Community LEGO The Lord of the Rings threads on pcconfig.txt, steamcommunity.com/app/214510/discussions/0/828923952080245879, /3732953986138513388 and /3044978964800588135.
+- S83 Steam Community Deep Rock Galactic threads on GameUserSettings.ini, steamcommunity.com/app/548430/discussions/1/1754653602249968658, /1609400247620241842, /2989789048616096500 and /3279194170694015446.
+- S84 Steam Community Deep Rock Galactic performance threads, steamcommunity.com/app/548430/discussions/1/3004430047192719418 and /4120176169352158726; checkfps.io/en/optimize-fps/deep-rock-galactic (modelled figures, not used).
+- S85 gamepretty.com, Detroit Become Human: How to Unlock FPS Limit (Files Editing); Steam Community steamcommunity.com/app/1222140/discussions/0/3006675644850470546 (WindowsInfo.JSON); magicgameworld.com Detroit save location; quanticdream.com/en/Detroit-become-human-support (VkPipelineCache in ShaderCache).
+- S86 Steam Community Disco Elysium threads, steamcommunity.com/app/632470/discussions/0/3839927819745185426, /1609400247637987768 and /3875966763784500628; magicgameworld.com Disco Elysium save location.
+- S87 Steam Community Dishonored threads, steamcommunity.com/app/205100/discussions/0/521643320364676984, /343786746005802104 and /4638240084912557601; computerbase.de forum thread 1121444 (MaxAnisotropy, bForceNoStartupMovies).
+- S88 Supergiant Games, Hades Technical Support Guide, supergiantgames.com/faqs/hades/; Steam Community steamcommunity.com/app/1145360/discussions/1/3048356660231182163; shacknews.com article 146095 (Hades II folder).
+- S89 Steam Community Hotline Miami thread quoting the official FAQ, steamcommunity.com/app/219150/discussions/0/3109140779861762804; GamingOnLinux, Hotline Miami Linux beta is now out on Steam (2013).
+- S90 primagames.com and dotesports.com Lethal Company save location articles; Steam Community steamcommunity.com/app/1966720/discussions/0/4140564923171335409; thunderstore.io Save Utils (Easy Save 3).
+- S91 gamerblurb.com, MegaBonk Best Graphics Settings Guide; nexusmods.com/megabonk/mods/16 (LocalLow/Ved/Megabonk).
+- S92 magicgameworld.com, Monster Hunter Stories 2: where are the configuration files; protondb.com/app/1412570.
+- S93 Steam Community Risk of Rain 2 threads, steamcommunity.com/app/632360/discussions/0/1768133742957244753, /1768134097436234369 and /1647665620939009567; gamerevolution.com console commands article (fps_max).
+- S94 Steam Community Slime Rancher threads, steamcommunity.com/app/433340/discussions/0/1692659135912406626 and /133261370017602284.
+- S95 cyberly.org, Tactical Breach Wizards save backup.
+- S96 Terraria Wiki, Config.json, terraria.wiki.gg/wiki/Config.json.
+- S97 Steam Community Witcher 3 thread with a dx12user.settings dump, steamcommunity.com/app/292030/discussions/0/3723945543095875702; vgtimes.ru guide 24236 (user.settings for DirectX 11, dx12user.settings for DirectX 12); a real pre 4.0 user.settings, github.com/tafulop/Witcher-3-Wild-Hunt/blob/master/user.settings.bak (read directly).
+- S98 Guru3D, The Witcher 3 tweak thread, forums.guru3d.com/threads/the-witcher-3-tweak-thread.399238/; Level1Techs, Witcher 3 Tips and Tricks (SSAOSolution); stepmodifications.org Return of the White Wolf guide (Documents\The Witcher 3); primagames.com Witcher 3 ini tweaks (GrassDensity, FoliageDistanceScale Ultra values).
+- S99 KeenGamer, The Witcher 3 Remastered best graphics settings for max fps; GamingOnLinux comments, gamingonlinux.com/articles/22050 (DirectX 12 vs 11 under Proton, May 2026) and the December 2022 Proton hotfix articles.
+- S100 Fatshark support, PC Settings Resetting on Launch, support.fatshark.se/hc/en-us/articles/360034118334 and article 360017633918; devtrackers.gg Darktide, nv_framerate_cap simple question.
+- S101 Vermintide 2 script mirror, github.com/Aussiemon/Vermintide-2-Source-Code, scripts/settings/default_user_settings.lua (read directly, 23 Oct 2026).
+- S102 Steam Community Mechanicus thread, steamcommunity.com/app/673880/discussions/0/3104564981115536521; GamingOnLinux, Warhammer 40,000: Mechanicus officially released for Linux (2019).
+- S103 Nexus Mods forum, Partial solution to config.ini merging issues, forums.nexusmods.com/topic/3971445; GamingOnLinux, Tweaking performance in XCOM 2 (2016); Steam Community steamcommunity.com/app/268500/discussions/0/1839063537794426870.
