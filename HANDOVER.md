@@ -4,7 +4,7 @@
 1. The four bugs from the first PC run are fixed, each with a regression test built from the PC's real output: the library listed every game twice, CS2 showed as Proton, the probe printed "DP-2: None", and the DRM mode lists repeated (and the LG's 4K entries looked native).
 2. The search is now native first; DLSS Quality (FSR Quality for CS2) is only tried when no native rung reaches the goal. Proton 9+ needs nothing extra for DLSS. Warframe advice is native borderless without Gamescope plus a KWin rule pinning it to DP-2. The first Warframe run offers three Captura scenes.
 3. Five more adapters: Borderlands 3, Garry's Mod, Brotato, Bloons TD 6, Risk of Rain Returns. Only Garry's Mod tunes straight away. The others measure until their settings are confirmed on the PC with the new read only `find-settings` and `discover`.
-4. 126 passed, 1 skipped in the cloud (Python 3.13); `selftest` 20 checks. Nothing has touched the PC since the first read only run.
+4. 127 passed, 1 skipped in the cloud (Python 3.13); `selftest` 20 checks. Nothing has touched the PC since the first read only run.
 5. Commands for the PC are below; items that need Matthew, his PC or a decision are listed at the end.
 
 ## Goal
@@ -64,7 +64,7 @@ python3 -m gopt undo <run-id>
 ```
 
 ## How to verify (cloud)
-`python3 -m pytest -q` from the repo root: 126 passed, 1 skipped (a permissions test that cannot run as root).
+`python3 -m pytest -q` from the repo root: 127 passed, 1 skipped (a permissions test that cannot run as root).
 
 ## Next steps (in order)
 1. On the PC: the re-check commands above, then `discover` and `find-settings`; record results in a dated `VERIFIED.md` and move facts from [U] to [V].

@@ -155,6 +155,12 @@ class Steam:
         return "unknown", "no executables found and no compatdata", None
 
     def apps(self) -> list[InstalledApp]:
+        """Installed apps, read once per Steam object (the runtime check walks install folders)."""
+        if getattr(self, "_apps", None) is None:
+            self._apps = self._read_apps()
+        return list(self._apps)
+
+    def _read_apps(self) -> list[InstalledApp]:
         out = []
         seen: set[int] = set()
         mapping = self.compat_tool_mapping()

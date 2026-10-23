@@ -189,3 +189,15 @@ def test_warframe_target_drops_gamescope_and_grab_cursor(steam):
     assert sess.launch_option_target() == "mangohud %command%"
     assert any("Borderless" in a for a in sess.ad.launch_advice)
     assert any("steam_app_230410" in a and "DP-2" in a for a in sess.ad.launch_advice)
+
+
+
+def test_apps_are_read_once_per_steam_object(steam, monkeypatch):
+    s = Steam(steam["root"])
+    calls = []
+    real = Steam.scan_binaries
+    monkeypatch.setattr(Steam, "scan_binaries", staticmethod(lambda *a, **k: calls.append(1) or real(*a, **k)))
+    s.app(730), s.app(230410), s.apps()
+    first = len(calls)
+    s.app(730)
+    assert len(calls) == first and first <= len(s.apps())

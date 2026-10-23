@@ -3,7 +3,7 @@
 Read DESIGN-BRIEF.md (the ask), DESIGN.md (the design) and ADAPTERS-RESEARCH.md (per setting tables) first. Matthew's standing rules in the matthew-dev-rules skill apply; this file adds the project specifics.
 
 ## State (23 Oct 2026, evening)
-- Built: `python3 -m gopt` with plan, tune, measure, undo, discover, find-settings, library, games, show, probe, selftest. 126 tests green (`python3 -m pytest -q`). See HANDOVER.md for the PC commands and open items.
+- Built: `python3 -m gopt` with plan, tune, measure, undo, discover, find-settings, library, games, show, probe, selftest. 127 tests green (`python3 -m pytest -q`). See HANDOVER.md for the PC commands and open items.
 - Adapters: warframe, cs2, garrysmod (tune); borderlands3 (tune after discover); brotato, bloonstd6, riskofrainreturns (measure only until find-settings).
 - First read only run on the PC 23 Oct 2026 found four bugs, all fixed with regression tests (fixtures from the PC's real kscreen-doctor output). Next on the PC: re-check, discover, find-settings.
 - Decisions (Matthew, 23 Oct 2026): DLSS allowed, native first, DLSS Quality only if native cannot reach the goal; Warframe native borderless without Gamescope, KWin rule to DP-2; Captura scene picked on the first run.
