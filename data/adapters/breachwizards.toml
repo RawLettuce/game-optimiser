@@ -1,0 +1,38 @@
+# Tactical Breach Wizards adapter (Proton, app 1043810, Unity). Sources: ADAPTERS-RESEARCH.md 9.13.
+# Saves are in AppData\LocalLow\Suspicious Developments\Tactical Breach Wizards\SaveData [S]; no source names
+# the settings file. A turn based game: the adapter measures only (needs discover).
+
+[game]
+id = "breachwizards"
+name = "Tactical Breach Wizards"
+appid = 1043810
+runtime = "proton"
+program = "TacticalBreachWizards.exe"   # [U]
+processes = ["TacticalBreachWizards.exe", "Tactical Breach Wizards.exe"]
+headroom = 1.10                         # turn based; rooms are similar
+confidence = "needs discover: file"
+
+[files.settings]
+note = "saves in AppData\\LocalLow\\Suspicious Developments\\Tactical Breach Wizards\\SaveData inside the prefix [S]; settings file unknown"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Turn Steam Cloud off before any hand edit in that folder [S]",
+  "Unity player options after %command% force the mode: -screen-width 3840 -screen-height 2160 -window-mode borderless [S]",
+  "KWin rule if it opens on the LG: class 'steam_app_1043810' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "fixed mission start"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Tactical Breach Wizards benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Replay the same mission from its start; press Shift+F2 when the first room appears.
+ 3. Pan the camera the same way for about 60 s, then quit the game fully.
+"""

@@ -1,0 +1,38 @@
+# Warhammer 40,000: Mechanicus adapter (native Linux, app 673880, Unity, Bulwark Studios). Sources:
+# ADAPTERS-RESEARCH.md 9.17. A Steam thread puts Linux data under ~/.config/unity3d/Bulw... (cut off) and
+# Windows data in AppData\LocalLow\BulwarkStudios [S]. No settings file is documented and the tool does not
+# write under the home folder yet: measure only (needs discover).
+
+[game]
+id = "mechanicus"
+name = "Warhammer 40,000: Mechanicus"
+appid = 673880
+runtime = "native"
+program = "Mechanicus.x86_64"        # [U]
+processes = ["Mechanicus.x86_64", "Mechanicus"]
+headroom = 1.15                      # turn based; big battles with many units vs the Ark
+confidence = "needs discover: file"
+
+[files.settings]
+note = "~/.config/unity3d/BulwarkStudios/... (native, folder name cut off in the source) [S]; settings file unknown"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["LD_PRELOAD"]
+advice = [
+  "The Linux build is officially supported since 1.1.3 [S]",
+  "Unity player options after %command% force the mode: -screen-width 3840 -screen-height 2160 -window-mode borderless [S]",
+]
+
+[benchmark]
+scene = "fixed battle start"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Mechanicus benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same save at the start of a battle; press Shift+F2 and pan the camera the same way.
+ 3. Quit the game fully after the log stops.
+"""

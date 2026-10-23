@@ -1,0 +1,92 @@
+# XCOM 2 adapter (Proton, app 268500, Unreal Engine 3). Sources: ADAPTERS-RESEARCH.md 9.19.
+# The game caches its graphics settings in the My Games copy of XComEngine.ini, Documents\My Games\XCOM2\
+# XComGame\Config [S]; -REGENERATEINIS resets it to defaults [S]. The keys below are Unreal Engine 3's usual
+# [SystemSettings] names [U]; no source ties them to XCOM 2's menu, so every one is guess = true and nothing
+# is written until `gopt discover xcom2` maps it on the PC (needs discover). Until then: measure only.
+# War of the Chosen keeps its own folder (My Games\XCOM2 War of the Chosen) [U]; this adapter is the base game.
+
+[game]
+id = "xcom2"
+name = "XCOM 2"
+appid = 268500
+runtime = "proton"
+program = "XCom2.exe"                # [U] Binaries/Win64
+processes = ["XCom2.exe", "Launcher.exe"]
+headroom = 1.20                      # big missions with fire and smoke vs the Avenger
+confidence = "needs discover: keys"
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/Documents/My Games/XCOM2/XComGame/Config/XComEngine.ini"
+format = "ini"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "The game tries to reset XComEngine.ini to defaults; some players mark it read only [S]. The tool does not; it checks the file after each run",
+  "Players raise the texture streaming PoolSize (default 10 MB) for smoothness [S]; the tool does not change it",
+  "For the tuning runs: VSync off and frame smoothing off in Options > Graphics [U: option names]",
+  "KWin rule if it opens on the LG: class 'steam_app_268500' (substring), Screen Force = AGON (DP-2)",
+]
+
+[[settings]]
+id = "shadows"
+label = "Shadow Quality"
+key = "SystemSettings::MaxShadowResolution"
+levels = ["512", "1024", "2048", "4096"]
+labels = ["Low", "Medium", "High", "Maximum"]
+cost = [1.00, 1.04, 1.08, 1.14]      # estimate
+cpu = false
+visual = 3
+guess = true
+status = "U"
+
+[[settings]]
+id = "ambient_occlusion"
+label = "Ambient Occlusion"
+key = "SystemSettings::AmbientOcclusion"
+levels = ["False", "True"]
+labels = ["Off", "On"]
+cost = [1.00, 1.08]                  # estimate
+cpu = false
+visual = 3
+guess = true
+status = "U"
+
+[[settings]]
+id = "depth_of_field"
+label = "Depth of Field"
+key = "SystemSettings::DepthOfField"
+levels = ["False", "True"]
+labels = ["Off", "On"]
+cost = [1.00, 1.04]                  # estimate
+cpu = false
+visual = 2
+guess = true
+status = "U"
+
+[[settings]]
+id = "anisotropy"
+label = "Anisotropic Filtering"
+key = "SystemSettings::MaxAnisotropy"
+levels = ["0", "4", "8", "16"]
+labels = ["Off", "4x", "8x", "16x"]
+cost = [1.00, 1.003, 1.006, 1.01]    # negligible on modern GPUs
+cpu = false
+visual = 3
+guess = true
+status = "U"
+
+[benchmark]
+scene = "Avenger walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+XCOM 2 benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same save on the Avenger; press Shift+F2 and pan across the same rooms.
+ 3. Quit the game fully. Missions are heavier: log one with `gopt measure xcom2 --free-play`.
+"""

@@ -1,0 +1,50 @@
+# Dishonored adapter (Proton, app 205100, Unreal Engine 3). Sources: ADAPTERS-RESEARCH.md 9.5.
+# DishonoredEngine.ini lives in Documents\My Games\Dishonored\DishonoredGame\Config [S], but players say the
+# menu options are saved in options.sav (Steam Cloud, userdata/<id>/205100/remote) and the ini files hold
+# "everything else" [S]. options.sav is binary, so the adapter measures only; `gopt show dishonored` reads two
+# ini values players tweak. Nothing is written (no key here has a source that ties it to the menu).
+
+[game]
+id = "dishonored"
+name = "Dishonored"
+appid = 205100
+runtime = "proton"
+program = "Dishonored.exe"           # [U] Binaries/Win32
+processes = ["Dishonored.exe"]
+headroom = 1.15                      # Dunwall streets with guards and rats vs a quiet interior
+confidence = "measure only: file known"
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/Documents/My Games/Dishonored/DishonoredGame/Config/DishonoredEngine.ini"
+format = "ini"
+status = "S"
+
+[[info_keys]]
+key = "SystemSettings::MaxAnisotropy"
+label = "anisotropic filtering [S key, U section]"
+
+[[info_keys]]
+key = "FullScreenMovie::bForceNoStartupMovies"
+label = "skip intro movies [S key, U section]"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Players skip the intro movies with bForceNoStartupMovies=True in DishonoredEngine.ini [S]; do it by hand with the game closed if wanted",
+  "VSync off in Options > Graphics for the tuning runs; Unreal Engine 3 games often also cap fps with bSmoothFrameRate, unchecked for this game [U]",
+  "KWin rule if it opens on the LG: class 'steam_app_205100' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "fixed save walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Dishonored benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same save (an outdoor street in Dunwall) and walk the same route.
+ 3. Press Shift+F2 when you gain control; quit the game fully after the log stops.
+"""

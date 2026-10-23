@@ -1,0 +1,37 @@
+# Hotline Miami adapter (native Linux, app 219150, GameMaker). Sources: ADAPTERS-RESEARCH.md 9.7.
+# The official FAQ (quoted on Steam) puts SaveData.sav in $XDG_DATA_HOME/Hotline Miami/ or
+# ~/.local/share/Hotline Miami/ [S]; no source names a separate settings file. Native games keep their files
+# under the home folder, which the tool does not write to yet, so the adapter measures only (needs discover).
+
+[game]
+id = "hotlinemiami"
+name = "Hotline Miami"
+appid = 219150
+runtime = "native"
+program = "Hotline"                  # [U] native binary name
+processes = ["Hotline", "hotline_launcher"]
+headroom = 1.05                      # a light 2D game; every level is similar
+confidence = "needs discover: file"
+
+[files.settings]
+note = "SaveData.sav in ~/.local/share/Hotline Miami/ (native) [S]; no settings file documented"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["LD_PRELOAD"]
+advice = [
+  "A 2D game that will reach any goal on this PC; measure only to confirm, there is nothing to tune",
+]
+
+[benchmark]
+scene = "first level"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Hotline Miami benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Replay the same chapter from the chapter select; press Shift+F2 when it starts.
+ 3. Quit the game fully after the log stops.
+"""

@@ -1,0 +1,40 @@
+# Detroit: Become Human adapter (Proton, app 1222140, Quantic Dream engine, Vulkan). Sources: ADAPTERS-RESEARCH.md 9.3.
+# One low quality guide names GraphicOptions.JSON in the install folder with a FRAME_RATE_LIMIT key, and a
+# Steam thread names WindowsInfo.JSON there [S]. Neither is confirmed and the exact file name case matters on
+# Linux, so the file is not used: measure only until `gopt find-settings detroit` names it (needs discover).
+
+[game]
+id = "detroit"
+name = "Detroit: Become Human"
+appid = 1222140
+runtime = "proton"
+program = "DetroitBecomeHuman.exe"   # [U]
+processes = ["DetroitBecomeHuman.exe"]
+headroom = 1.15                      # scripted chapters; crowd scenes are heavier than interiors
+confidence = "needs discover: file"
+
+[files.settings]
+note = "GraphicOptions.JSON (FRAME_RATE_LIMIT) and WindowsInfo.JSON (MONITOR, DISPLAY_MODE) in the install folder [S, unconfirmed]"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "For the tuning runs: frame rate limit off in Settings > Graphics [S: FRAME_RATE_LIMIT exists]",
+  "The game runs on Vulkan, so no DXVK or vkd3d layer is involved; first start builds a pipeline cache [S]",
+  "KWin rule if it opens on the LG: class 'steam_app_1222140' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "chapter replay"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Detroit: Become Human benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Chapter select: replay the same chapter from its start every run (an interior chapter repeats best).
+ 3. Press Shift+F2 when you gain control and walk the same route for about 60 s.
+ 4. Quit the game fully.
+"""

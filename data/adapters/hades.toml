@@ -1,0 +1,38 @@
+# Hades adapter (Proton, app 1145360, Supergiant's own engine). Sources: ADAPTERS-RESEARCH.md 9.6.
+# Supergiant's FAQ names Profile1.sjson in Documents\Saved Games\Hades as the settings file [S]. SJSON is not a
+# format the tool reads, and the file also holds the profile, so the adapter measures only.
+
+[game]
+id = "hades"
+name = "Hades"
+appid = 1145360
+runtime = "proton"
+program = "Hades.exe"                # [U] x64 (DirectX) and x64Vk (Vulkan) builds both use this name [U]
+processes = ["Hades.exe"]
+headroom = 1.15                      # boss fights with many projectiles vs an early chamber
+confidence = "measure only: format"
+
+[files.settings]
+note = "Profile1.sjson in %USERPROFILE%\\Documents\\Saved Games\\Hades\\ inside the prefix [S]; SJSON is not supported yet and the file also holds the profile"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Back up Profile1.sjson before any hand edit; Supergiant's FAQ suggests deleting it only to fix update problems [S]",
+  "VSync and any frame rate cap off in Settings > Video for the tuning runs [U: option names]",
+  "KWin rule if it opens on the LG: class 'steam_app_1145360' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "Tartarus opening chambers"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Hades benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Start an escape with the same weapon and aspect; press Shift+F2 when the first chamber opens.
+ 3. Clear the first chambers for about 60 s, then quit the game fully.
+"""

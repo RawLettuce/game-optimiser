@@ -1,0 +1,39 @@
+# LEGO The Lord of the Rings adapter (Proton, app 214510, TT Games engine). Sources: ADAPTERS-RESEARCH.md 9.1.
+# Players name pcconfig.txt under %APPDATA%\Warner Bros. Interactive Entertainment\ [S], but two threads give
+# different folder names and nobody documents its format, so the file is not used: measure only until
+# `gopt find-settings legolotr` names it on the PC (needs discover).
+
+[game]
+id = "legolotr"
+name = "LEGO The Lord of the Rings"
+appid = 214510
+runtime = "proton"
+program = "LEGOLOTR.exe"             # [U]
+processes = ["LEGOLOTR.exe"]
+headroom = 1.20                      # busy hub areas and big fights are heavier than a quiet level start
+confidence = "needs discover: file"
+
+[files.settings]
+note = "pcconfig.txt in %APPDATA%\\Warner Bros. Interactive Entertainment\\<LEGOLordofTheRings or LEGOTheLordoftheRings>\\ inside the prefix [S]; folder name and format unconfirmed"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Players report pcconfig.txt holds WindowWidth, WindowHeight and the refresh rate, and that the video menu resets unless the change is confirmed [S]",
+  "KWin rule if it opens on the LG: class 'steam_app_214510' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "fixed level start"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+LEGO The Lord of the Rings benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same level from the same save in Free Play every run.
+ 3. Press Shift+F2 when you gain control and play the same opening section for about 60 s.
+ 4. Quit the game fully.
+"""
