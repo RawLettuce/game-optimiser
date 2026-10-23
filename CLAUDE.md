@@ -22,3 +22,4 @@ Read DESIGN-BRIEF.md (the ask), DESIGN.md (the design) and ADAPTERS-RESEARCH.md 
 
 ## Known blockers from the cloud container (23 Oct 2026)
 - These hosts are blocked here: wiki.warframe.com, steamcommunity.com, pcgamingwiki.com, docs.bazzite.gg, bo3.gg, forums.warframe.com, web.archive.org, warframe.fandom.com, pcgamer.com, techspot.com, logicalincrements.com, exputer.com, docs.unity3d.com, api.github.com. GitHub raw works (WFCD data, Proton, KDE and DXVK-NVAPI sources). Facts from the blocked hosts were taken from search engine quotations and are tagged [S].
+- Also blocked (23 Oct 2026, late): reddit.com, nexusmods.com, protondb.com, terraria.wiki.gg, gamersnexus.net, primagames.com, forum.level1techs.com, vgtimes.ru, dsogaming.com, gamestar.de, en.wikipedia.org, gist.githubusercontent.com. github.com git clones work (e.g. the Vermintide 2 script mirror). WebFetch fails on DNS for most hosts; test with curl through the proxy first.
