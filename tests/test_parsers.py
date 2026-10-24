@@ -13,7 +13,7 @@ FIX = Path(__file__).parent / "fixtures"
 @pytest.mark.parametrize("name", ["cs2_video.txt", "localconfig.vdf", "loginusers.vdf",
                                   "libraryfolders.vdf", "appmanifest_230410.acf"])
 def test_keyvalues_round_trip_is_byte_identical(name):
-    text = (FIX / name).read_text(newline="")
+    text = (FIX / name).read_bytes().decode("utf-8")
     kv = KeyValues(text)
     assert kv.text == text
     assert kv.roots, "parsed nothing"
@@ -28,7 +28,7 @@ def test_keyvalues_reads_nested_values():
 
 
 def test_keyvalues_set_existing_value_changes_one_line_only():
-    text = (FIX / "cs2_video.txt").read_text(newline="")
+    text = (FIX / "cs2_video.txt").read_bytes().decode("utf-8")
     kv = KeyValues(text)
     new = kv.set(["video.cfg", "setting.videocfg_shadow_quality"], "1")
     a, b = text.splitlines(), new.text.splitlines()
@@ -73,7 +73,7 @@ def test_keyvalues_ignores_comments_and_conditionals():
 # ---------------- EE.cfg -----------------
 
 def test_eecfg_round_trip_is_byte_identical():
-    text = (FIX / "EE.cfg").read_text(newline="")
+    text = (FIX / "EE.cfg").read_bytes().decode("utf-8")
     cfg = EECfg(text)
     assert cfg.text() == text
 

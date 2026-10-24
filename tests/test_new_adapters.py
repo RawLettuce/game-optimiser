@@ -111,7 +111,7 @@ def test_borderlands3_discovered_key_enters_the_ladder(env):
         "key": "ScalabilityGroups::sg.ShadowQuality", "levels": ["0", "1", "2", "3", "4"], "status": "V"}}}))
     code, text = tune("borderlands3", env, n=3)
     assert code == 0, text
-    ini = env["ue_ini"].read_text(newline="")
+    ini = env["ue_ini"].read_bytes().decode("utf-8")
     assert "\r\nsg.ShadowQuality=" in ini and ini.count("\r\n") == (FIX / "GameUserSettings.ini").read_bytes().count(b"\r\n")
 
 

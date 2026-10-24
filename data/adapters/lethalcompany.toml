@@ -1,0 +1,39 @@
+# Lethal Company adapter (Proton, app 1966720, Unity). Sources: ADAPTERS-RESEARCH.md 9.8.
+# Saves and LCGeneralSaveData sit in %USERPROFILE%\AppData\LocalLow\ZeekerssRBLX\Lethal Company [S]. They are
+# Easy Save 3 files [S]; no source says which of them holds the display options or under what keys, so the
+# adapter measures only until `gopt find-settings lethalcompany` shows the file (needs discover).
+
+[game]
+id = "lethalcompany"
+name = "Lethal Company"
+appid = 1966720
+runtime = "proton"
+program = "Lethal Company.exe"       # [U]
+processes = ["Lethal Company.exe"]
+headroom = 1.20                      # facility interiors with monsters and the ship outside differ a lot
+confidence = "needs discover: file"
+
+[files.settings]
+note = "LCGeneralSaveData (Easy Save 3) in AppData\\LocalLow\\ZeekerssRBLX\\Lethal Company inside the prefix [S]; which file holds the display options is unknown"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Players fix broken saves by deleting LCGeneralSaveData only; back up the whole folder first [S]",
+  "For the tuning runs: frame rate cap off in Settings [U: option name]",
+  "KWin rule if it opens on the LG: class 'steam_app_1966720' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "ship and company building"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Lethal Company benchmark (about 60 s, solo):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Host a solo lobby; on the ship press Shift+F2 and walk the same loop around the ship and terminal.
+ 3. Quit the game fully after the log stops. Facility interiors are heavier: use `--free-play` for those.
+"""

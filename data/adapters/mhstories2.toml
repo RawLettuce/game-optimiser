@@ -1,0 +1,39 @@
+# Monster Hunter Stories 2: Wings of Ruin adapter (Proton, app 1277400). Sources: ADAPTERS-RESEARCH.md 9.10.
+# One guide puts a config.ini in the install folder [S, single low quality source]; its keys are not documented
+# anywhere reachable. The adapter measures only until `gopt find-settings mhstories2` names the file and
+# `discover` its keys (needs discover).
+
+[game]
+id = "mhstories2"
+name = "Monster Hunter Stories 2: Wings of Ruin"
+appid = 1277400
+runtime = "proton"
+program = "game.exe"                 # [U]
+processes = ["game.exe", "MHST2.exe"]
+headroom = 1.15                      # open fields with many monsters vs a village
+confidence = "needs discover: file"
+
+[files.settings]
+note = "config.ini in the install folder [S, one source]; keys unknown"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "ProtonDB rates the game Gold and it is Steam Deck Verified [S]; no extra launch options are needed",
+  "For the tuning runs: frame rate cap off and VSync off in Options > Graphics [U: option names]",
+  "KWin rule if it opens on the LG: class 'steam_app_1277400' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "fixed field walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Monster Hunter Stories 2 benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same save in an open field and ride the same route; press Shift+F2 at the start.
+ 3. Quit the game fully after the log stops.
+"""

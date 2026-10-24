@@ -1,0 +1,40 @@
+# Warhammer: Vermintide 2 adapter (Proton, app 552500, Fatshark's Stingray based engine). Sources:
+# ADAPTERS-RESEARCH.md 9.18. Settings are user_settings.config in %APPDATA%\Fatshark\Vermintide 2 [S, Fatshark
+# support]. The game's own scripts (community mirror) name the keys, among them max_fps, dlss_enabled and
+# fsr2_enabled [S]. The file is Stingray's SJSON, which the tool cannot read yet, so the adapter measures only.
+
+[game]
+id = "vermintide2"
+name = "Warhammer: Vermintide 2"
+appid = 552500
+runtime = "proton"
+program = "vermintide2.exe"          # [U] DirectX 11 build; vermintide2_dx12.exe for DirectX 12 [U]
+processes = ["vermintide2.exe", "vermintide2_dx12.exe", "launcher.exe"]
+headroom = 1.40                      # hordes are far heavier than the Keep
+confidence = "measure only: format"
+
+[files.settings]
+note = "user_settings.config (SJSON) in AppData\\Roaming\\Fatshark\\Vermintide 2 inside the prefix [S]; keys known from the game scripts (max_fps defaults to 0 [S], read as uncapped [U]); SJSON is not supported yet"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Settings that reset on launch usually mean user_settings.config is read only [S]",
+  "For the tuning runs: Max FPS uncapped (max_fps defaults to 0 [S]) and VSync off (vsync defaults to true [S])",
+  "Native first: DLSS and FSR 2 are off by default [S]; keep them off for the native measurement",
+  "KWin rule if it opens on the LG: class 'steam_app_552500' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "Taal's Horn Keep walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Vermintide 2 benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above (same DirectX version every run).
+ 2. In the Keep, press Shift+F2 and walk the same loop (courtyard, forge, back).
+ 3. Quit the game fully. Hordes in missions are much heavier: log one with `gopt measure vermintide2 --free-play`.
+"""

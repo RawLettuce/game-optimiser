@@ -1,0 +1,39 @@
+# Megabonk adapter (native Linux per the library, app 3405340, Unity). Sources: ADAPTERS-RESEARCH.md 9.9.
+# The Windows save folder is AppData\LocalLow\Ved\Megabonk [S]; no source gives the Linux location or a
+# settings file. Unity native games usually keep data in ~/.config/unity3d/<company>/<product> [U]. The tool
+# does not write under the home folder yet, so the adapter measures only (needs discover).
+
+[game]
+id = "megabonk"
+name = "Megabonk"
+appid = 3405340
+runtime = "native"
+program = "Megabonk.x86_64"          # [U] Unity's usual native binary name
+processes = ["Megabonk.x86_64", "Megabonk"]
+headroom = 1.40                      # late runs with huge swarms are far heavier than the first minute
+confidence = "needs discover: file"
+
+[files.settings]
+note = "Linux location unknown; Windows keeps saves in AppData\\LocalLow\\Ved\\Megabonk [S]; try ~/.config/unity3d/Ved/Megabonk [U]"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["LD_PRELOAD"]
+advice = [
+  "Menu options with an fps cost: shadow quality and resolution, anti-aliasing (x8 costs most in swarms), soft particles, bloom, motion blur [S]",
+  "For the tuning runs: FPS Limit Unlimited (or 300) and VSync off [S]",
+  "KWin rule if it opens on the LG: class 'Megabonk' (substring), Screen Force = AGON (DP-2) [U: class]",
+]
+
+[benchmark]
+scene = "fixed run start"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Megabonk benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Same character and map every run; press Shift+F2 when the run starts and play the first 60 s.
+ 3. Quit the game fully. Late swarms are much heavier: log one with `gopt measure megabonk --free-play`.
+"""

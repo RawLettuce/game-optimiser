@@ -1,0 +1,132 @@
+# The Witcher 3: Wild Hunt (Complete Edition, 4.x) adapter (Proton, app 292030, REDengine 3). Sources:
+# ADAPTERS-RESEARCH.md 9.15. Settings are ini style files in Documents\The Witcher 3: user.settings for
+# DirectX 11 and dx12user.settings for DirectX 12 [S]. This adapter edits dx12user.settings, the default
+# renderer (a May 2026 report says the next update makes DirectX 12 the only one [S]).
+# The keys below come from pre 4.0 user.settings files and tweak threads [S]; none is confirmed in the 4.x
+# DirectX 12 file and some menu options change several keys at once, so every setting is guess = true:
+# nothing is written until `gopt discover witcher3` maps it on the PC (needs discover). Until then: measure only.
+
+[game]
+id = "witcher3"
+name = "The Witcher 3: Wild Hunt"
+appid = 292030
+runtime = "proton"
+program = "witcher3.exe"             # [U] bin/x64_dx12/witcher3.exe; the DirectX 11 build sits in bin/x64
+processes = ["witcher3.exe", "REDprelauncher.exe"]
+headroom = 1.25                      # Novigrad and Beauclair crowds are far heavier than open fields
+confidence = "needs discover: keys"
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/Documents/The Witcher 3/dx12user.settings"
+format = "ini"                       # [Section] and Key=Value; keys are "Section::Key"
+status = "S"
+
+[[run_overrides]]
+key = "Engine::LimitFPS"
+value = "0"
+status = "U"
+why = "the frame rate cap must be off while measuring (a real file has LimitFPS=60 under [Engine] [S]; the uncapped value is unknown)"
+manual = "Options > Graphics > Maximum Frames Per Second: Unlimited for the tuning runs"
+
+[[run_overrides]]
+key = "Viewport::VSync"
+value = "false"
+status = "U"
+why = "VSync must be off while measuring (VSync=true under [Viewport] in a real file [S])"
+manual = "Options > Graphics > VSync: Off for the tuning runs"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Players report DirectX 12 runs at about half the frame rate of DirectX 11 under Proton without ray tracing [S, one report]; the renderer choice is yours (launcher), the tool tunes dx12user.settings",
+  "--launcher-skip after %command% skips the REDlauncher [S]",
+  "Native first: DLSS or FSR stay off for the native ladder; their keys are not mapped yet",
+  "KWin rule if it opens on the LG: class 'steam_app_292030' (substring), Screen Force = AGON (DP-2)",
+]
+
+[[settings]]
+id = "hairworks"
+label = "Nvidia HairWorks"
+key = "Rendering::HairWorksLevel"
+levels = ["0", "1", "2"]
+labels = ["Off", "Geralt Only", "All"]
+cost = [1.00, 1.08, 1.20]            # turning HairWorks off is the first advice in every guide [S]; estimate
+cpu = false
+visual = 2
+guess = true
+status = "S"
+
+[[settings]]
+id = "ssao"
+label = "Ambient Occlusion"
+key = "PostProcess::SSAOSolution"
+levels = ["0", "1", "2"]
+labels = ["Off", "SSAO", "HBAO+"]
+cost = [1.00, 1.03, 1.07]            # HBAO+ (2) is the expensive one, SSAO (1) lighter [S]; estimate
+cpu = false
+visual = 3
+guess = true
+status = "S"
+
+[[settings]]
+id = "shadows"
+label = "Shadow Quality"
+key = "Rendering::CascadeShadowmapSize"
+levels = ["1024", "1536", "2048", "3072"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.04, 1.08, 1.13]      # Medium saves more than most post processing [S]; levels and cost estimate
+cpu = true
+visual = 3
+guess = true
+status = "U"
+
+[[settings]]
+id = "foliage"
+label = "Foliage Visibility Range"
+key = "Rendering/SpeedTree::FoliageDistanceScale"
+levels = ["0.4", "0.6", "0.8", "1"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.04, 1.08, 1.13]      # Ultra is 1 [S]; big cost in forests [S]; lower levels and cost estimate
+cpu = true
+visual = 3
+guess = true
+status = "S"
+
+[[settings]]
+id = "grass"
+label = "Grass Density"
+key = "Rendering::GrassDensity"
+levels = ["800", "1200", "1600", "2400"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.02, 1.04, 1.07]      # Ultra is 2400 [S]; lower levels and cost estimate
+cpu = true
+visual = 3
+guess = true
+status = "S"
+
+[[settings]]
+id = "anisotropy"
+label = "Texture Anisotropy"
+key = "Rendering::MaxTextureAnizotropy"
+levels = ["0", "4", "8", "16"]
+labels = ["Off", "4x", "8x", "16x"]
+cost = [1.00, 1.003, 1.006, 1.01]    # spelled Anizotropy in the file [S]; cost negligible on modern GPUs
+cpu = false
+visual = 3
+guess = true
+status = "S"
+
+[benchmark]
+scene = "Novigrad walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+The Witcher 3 benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above (same renderer every run).
+ 2. Keep one manual save at the Novigrad Hierarch Square signpost; load it and walk the same route
+    through the market. Press Shift+F2 when you gain control.
+ 3. Quit the game fully after the log stops.
+"""

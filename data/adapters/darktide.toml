@@ -1,0 +1,39 @@
+# Warhammer 40,000: Darktide adapter (Proton, app 1361210, Fatshark's Stingray based engine). Sources:
+# ADAPTERS-RESEARCH.md 9.16. Settings are user_settings.config in %APPDATA%\Fatshark\Darktide [S, Fatshark
+# support]. It is Stingray's SJSON, which the tool cannot read yet, so the adapter measures only.
+
+[game]
+id = "darktide"
+name = "Warhammer 40,000: Darktide"
+appid = 1361210
+runtime = "proton"
+program = "Darktide.exe"             # [U] binaries/Darktide.exe
+processes = ["Darktide.exe", "launcher.exe"]
+headroom = 1.40                      # hordes are far heavier than the Mourningstar hub
+confidence = "measure only: format"
+
+[files.settings]
+note = "user_settings.config (SJSON) in AppData\\Roaming\\Fatshark\\Darktide inside the prefix [S]; SJSON is not supported yet"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Settings that reset on launch usually mean user_settings.config is read only; Steam Cloud can also restore an old copy [S]",
+  "For the tuning runs: frame rate cap off and VSync off in Options > Graphics; Nvidia Reflex's cap (nv_framerate_cap) also limits fps [S]",
+  "Native first: DLSS and FSR off for the native measurement",
+  "KWin rule if it opens on the LG: class 'steam_app_1361210' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "Psykhanium or Mourningstar walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Darktide benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Mourningstar hub: spawn, press Shift+F2 and walk the same loop to the armoury and back.
+ 3. Quit the game fully. Hordes in missions are much heavier: log one with `gopt measure darktide --free-play`.
+"""

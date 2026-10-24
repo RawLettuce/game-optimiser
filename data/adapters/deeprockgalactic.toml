@@ -1,0 +1,118 @@
+# Deep Rock Galactic adapter (Proton, app 548430, Unreal Engine 4). Sources: ADAPTERS-RESEARCH.md 9.2.
+# Players place GameUserSettings.ini in the install folder, FSD/Saved/Config/WindowsNoEditor [S], not in the
+# prefix. The keys below are Unreal's standard [ScalabilityGroups] names [S], but no source shows them in this
+# game's file, so every one is guess = true: nothing is written until `gopt discover deeprockgalactic` has
+# confirmed it on the PC (needs discover). Until then the adapter measures only.
+
+[game]
+id = "deeprockgalactic"
+name = "Deep Rock Galactic"
+appid = 548430
+runtime = "proton"
+program = "FSD-Win64-Shipping.exe"   # [U] Unreal's usual <Project>-Win64-Shipping.exe; FSD is the project name [S]
+processes = ["FSD-Win64-Shipping.exe", "FSD.exe"]
+headroom = 1.25                      # swarms in big caves (particles, volumetric dust) are far heavier than a quiet tunnel
+confidence = "needs discover: keys"
+
+[files.settings]
+path = "{install}/FSD/Saved/Config/WindowsNoEditor/GameUserSettings.ini"
+format = "ini"                       # Unreal Engine 4 ini; keys are "Section::Key"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Steam asks DirectX 11 or 12 at launch; players disagree on which is faster [S]. Pick one and keep it for every run",
+  "Options > Graphics: frame rate cap off and VSync off for the tuning runs; upscaling (FSR or DLSS) off for the native ladder",
+  "KWin rule if it opens on the LG: class 'steam_app_548430' (substring), Screen Force = AGON (DP-2)",
+]
+
+# Unreal scalability levels 0 to 3 are Low, Medium, High, Epic [S]; the menu calls the top one Ultra [U].
+[[settings]]
+id = "shadows"
+label = "Shadow Quality"
+key = "ScalabilityGroups::sg.ShadowQuality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.05, 1.11, 1.18]     # players name shadows the biggest cost for the least visual gain [S]; estimate
+cpu = true
+visual = 3
+guess = true
+status = "S"
+
+[[settings]]
+id = "view_distance"
+label = "View Distance"
+key = "ScalabilityGroups::sg.ViewDistanceQuality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.03, 1.06, 1.09]     # second cut players suggest after shadows [S]; estimate
+cpu = true
+visual = 3
+guess = true
+status = "S"
+
+[[settings]]
+id = "effects"
+label = "Effects Quality"
+key = "ScalabilityGroups::sg.EffectsQuality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.03, 1.06, 1.10]     # cave dust and particles are the main load in swarms [S, modelled guide]; estimate
+cpu = false
+visual = 3
+guess = true
+status = "S"
+
+[[settings]]
+id = "post_process"
+label = "Post Processing"
+key = "ScalabilityGroups::sg.PostProcessQuality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.02, 1.04, 1.07]     # estimate
+cpu = false
+visual = 2
+guess = true
+status = "S"
+
+[[settings]]
+id = "antialiasing"
+label = "Anti-Aliasing"
+key = "ScalabilityGroups::sg.AntiAliasingQuality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.01, 1.02, 1.04]     # players suggest low or off when GPU bound [S]; estimate
+cpu = false
+visual = 4
+guess = true
+status = "S"
+
+[[settings]]
+id = "textures"
+label = "Texture Quality"
+key = "ScalabilityGroups::sg.TextureQuality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.00, 1.01, 1.02]     # VRAM rather than fps; estimate
+cpu = false
+visual = 4
+vram_mb = [2000, 2500, 3200, 4000]  # estimate
+guess = true
+status = "S"
+
+[benchmark]
+scene = "Abyss Bar or a fixed solo mission start"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Deep Rock Galactic benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above (same DirectX choice every run).
+ 2. Space Rig: walk the same loop (drop pod bay, Abyss Bar, mission terminal) and press Shift+F2 at the start.
+    The Space Rig repeats exactly; missions are generated and vary.
+ 3. Quit the game fully after the log stops.
+ Swarms in big caves are much heavier: log one with `gopt measure deeprockgalactic --free-play`.
+"""

@@ -1,0 +1,38 @@
+# Risk of Rain 2 adapter (Proton, app 632360, Unity). Sources: ADAPTERS-RESEARCH.md 9.11.
+# Settings are console commands in a config file under <install>/Risk of Rain 2_Data/Config/ [S]; the file
+# name and its exact line format (players copy it to autoexec.cfg) are not confirmed, and the Source style
+# parser would drop a trailing semicolon, so the adapter measures only (needs discover).
+
+[game]
+id = "riskofrain2"
+name = "Risk of Rain 2"
+appid = 632360
+runtime = "proton"
+program = "Risk of Rain 2.exe"       # [U]
+processes = ["Risk of Rain 2.exe"]
+headroom = 1.35                      # late loops with many enemies and item effects are far heavier than stage 1
+confidence = "needs discover: file"
+
+[files.settings]
+note = "console commands in <install>/Risk of Rain 2_Data/Config/ (config.cfg) [S]; fps_max -1 is unlimited [S]; line format unconfirmed"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "For the tuning runs: VSync off (with it on players see 60 fps on 144 Hz screens [S]) and the frame cap unlimited (console fps_max -1 [S])",
+  "KWin rule if it opens on the LG: class 'steam_app_632360' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "stage 1"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Risk of Rain 2 benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Single player, same survivor, difficulty and stage 1 map choice every run; press Shift+F2 at the drop.
+ 3. Play the first 60 s, then quit the game fully. Late loops are much heavier: use `--free-play` for those.
+"""

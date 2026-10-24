@@ -1,0 +1,38 @@
+# Slime Rancher adapter (native Linux, app 433340, Unity). Sources: ADAPTERS-RESEARCH.md 9.12.
+# A 2017 thread gives ~/.config/unity3d/Monomi Park/Slime Rancher for the Linux saves and a reply doubts it
+# still holds [S]; Windows uses AppData\LocalLow\Monomi Park\Slime Rancher (confirmed by the developer) [S].
+# No settings file is documented and the tool does not write under the home folder yet: measure only.
+
+[game]
+id = "slimerancher"
+name = "Slime Rancher"
+appid = 433340
+runtime = "native"
+program = "SlimeRancher.x86_64"      # [U]
+processes = ["SlimeRancher.x86_64", "SlimeRancher"]
+headroom = 1.20                      # a full ranch with many slimes is heavier than the start
+confidence = "needs discover: file"
+
+[files.settings]
+note = "~/.config/unity3d/Monomi Park/Slime Rancher (native, 2017 report, disputed) [S]; settings file and keys unknown"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["LD_PRELOAD"]
+advice = [
+  "Steam Cloud may restore old files over hand edits [S]",
+  "Unity player options after %command% force the mode: -screen-width 3840 -screen-height 2160 -window-mode borderless [S]",
+]
+
+[benchmark]
+scene = "ranch walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Slime Rancher benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same save at the ranch house and walk the same loop of the ranch.
+ 3. Press Shift+F2 at the start; quit the game fully after the log stops.
+"""

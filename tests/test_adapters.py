@@ -9,7 +9,7 @@ from gopt.steam import Steam
 
 
 def test_all_adapters_load_and_are_consistent():
-    assert Adapter.available() == ["bloonstd6", "borderlands3", "brotato", "cs2", "garrysmod", "riskofrainreturns", "warframe"]
+    assert {"bloonstd6", "borderlands3", "brotato", "cs2", "garrysmod", "riskofrainreturns", "warframe"} <= set(Adapter.available())
     for game in Adapter.available():
         ad = Adapter.load(game)
         assert ad.settings or ad.benchmark.get("instructions"), game        # measure only adapters still benchmark

@@ -1,0 +1,39 @@
+# Terraria adapter (native Linux, app 105600). Sources: ADAPTERS-RESEARCH.md 9.14.
+# The Terraria Wiki puts config.json in $HOME/.local/share/Terraria on Linux and says to edit it only with
+# the game closed [S]. The tool does not write under the home folder yet (its write roots are the Steam
+# libraries, MangoHud's folder and its own data folder), and the graphics key names were not readable here,
+# so the adapter measures only. Adding a {home} path and write root is a small follow up after PR #1.
+
+[game]
+id = "terraria"
+name = "Terraria"
+appid = 105600
+runtime = "native"
+program = "Terraria.bin.x86_64"      # [U]
+processes = ["Terraria.bin.x86_64", "Terraria"]
+headroom = 1.25                      # boss fights, rain and many lights vs a quiet surface walk
+confidence = "needs discover: file"
+
+[files.settings]
+note = "config.json in $HOME/.local/share/Terraria (native) [S]; key names unread; the tool does not write under the home folder yet"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["LD_PRELOAD"]
+advice = [
+  "For the tuning runs: frame skip off in Settings > Video so the frame rate can exceed 60 [U: option name]",
+  "Lighting mode (Color, White, Retro, Trippy) is the usual fps setting in Terraria [U]",
+]
+
+[benchmark]
+scene = "fixed world walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Terraria benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Same character and world; stand at spawn, press Shift+F2 and walk the same route for about 60 s.
+ 3. Quit the game fully.
+"""

@@ -1,0 +1,42 @@
+# Disco Elysium adapter (Proton, app 632470, Unity). Sources: ADAPTERS-RESEARCH.md 9.4.
+# Settings are a Settings.json in %USERPROFILE%\AppData\LocalLow\ZAUM Studio\Disco Elysium\Settings\ [S]; sources
+# disagree on the case of the company folder, so the path matches any folder name there (it must match exactly
+# one file). The JSON keys are not documented beyond a graphics section with the resolution [S], so the adapter
+# measures only and never writes the file; `gopt discover` or `find-settings` can map keys later.
+
+[game]
+id = "discoelysium"
+name = "Disco Elysium"
+appid = 632470
+runtime = "proton"
+program = "disco.exe"                # [U]
+processes = ["disco.exe"]
+headroom = 1.10                      # an isometric game; Martinaise exterior is the heaviest area [U]
+confidence = "measure only: file known"
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/AppData/LocalLow/*/Disco Elysium/Settings/Settings.json"
+format = "json"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Settings.json only accepts resolutions the game lists [S]; Steam Cloud syncs it, so a Steam Deck session can change the PC resolution [S]",
+  "Unity player options after %command% force the mode: -screen-width 3840 -screen-height 2160 -window-mode borderless [S]",
+  "KWin rule if it opens on the LG: class 'steam_app_632470' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "Martinaise exterior walk"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Disco Elysium benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Load the same save outside the Whirling-in-Rags and walk the same loop with the camera unchanged.
+ 3. Press Shift+F2 at the start; quit the game fully after the log stops.
+"""
