@@ -82,6 +82,9 @@ python3 -m gopt measure warframe
 
 ### State
 - After merging PR #1's latest commit (83b7d5b, PC answers): 193 passed, 1 skipped on Python 3.13 and on 3.12 (the skipped test needs a non root user; it passes as `nobody`, 194/194). `selftest` 39 checks. CI green on GitHub Actions.
+- **24 Oct 2026 PC verification (`main` fast-forwarded to `claude/more-adapters-z901je`):**
+  - Ran `selftest` (`39/39` checks passed on Python 3.14.8, `gopt 0.2.0`), `library --games-only` (27 games with 26 adapters across 34 installed apps), `games`, and `show warframe` on the PC.
+  - Found and fixed Bazzite `/home` vs `/var/home` bind-mount duplicate library detection in `gopt/steam.py`: `Steam.libraries()` previously checked only `os.path.realpath()`, which does not collapse a bind mount, causing `/home/mpaylor/.local/share/Steam` and `/var/home/mpaylor/.local/share/Steam` to appear as `2 libraries` and listing Proton builds twice. `Steam.libraries()` now deduplicates by `(st.st_dev, st.st_ino)` as well as `os.path.realpath()`, with a regression check in `tests/test_steam.py` (`test_symlinked_home_lists_each_library_once`). Verified live: `34 installed apps in 1 libraries.` and `Proton builds: Proton - Experimental, Proton EasyAntiCheat Runtime`.
 - Confidence: tunes after `discover` (file known, keys guessed): Deep Rock Galactic, The Witcher 3, XCOM 2. Measure only with the file known: Disco Elysium, Dishonored. Measure only because the format (SJSON) is unsupported: Hades, Darktide, Vermintide 2. Needs `find-settings`: the other eleven.
 
 ### Exact commands for the PC (Konsole on the host, after PR #1's commands; all read only)

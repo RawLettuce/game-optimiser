@@ -52,17 +52,23 @@ class Steam:
 
     # ---- libraries and apps -------------------------------------------
     def libraries(self) -> list[Path]:
-        """Library folders, each listed once. Paths are compared by realpath: on Bazzite /home is a
-        symlink to /var/home, so the Steam root (/home/...) and libraryfolders.vdf (/var/home/...) name
-        the same folder (seen on the PC, 23 Oct 2026)."""
+        """Library folders, each listed once. Paths are compared by realpath and inode: on Bazzite
+        /home and /var/home may be a symlink or a bind mount, so the Steam root (/home/...) and
+        libraryfolders.vdf (/var/home/...) name the same folder (seen on the PC, 23-24 Oct 2026)."""
         libs: list[Path] = []
-        seen: set[str] = set()
+        seen: set[object] = set()
 
         def add(p: Path, first: bool = False):
             real = os.path.realpath(p)
-            if real in seen:
+            try:
+                st = os.stat(real)
+                key: object = (st.st_dev, st.st_ino) if st.st_ino else real
+            except OSError:
+                key = real
+            if real in seen or key in seen:
                 return
             seen.add(real)
+            seen.add(key)
             libs.insert(0, p) if first else libs.append(p)
 
         if (self.root / "steamapps").exists():

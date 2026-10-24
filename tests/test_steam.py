@@ -113,6 +113,13 @@ def test_symlinked_home_lists_each_library_once(tmp_path):
     assert len({os.path.realpath(p) for p in libs}) == 2
     ids = [a.appid for a in s.apps()]
     assert len(ids) == len(set(ids))
+    # Also when /home vs /var/home is a bind mount (realpath does not collapse them, but st_ino matches):
+    orig_realpath = os.path.realpath
+    try:
+        os.path.realpath = lambda p: str(p)
+        assert len(Steam(via_link).libraries()) == 2
+    finally:
+        os.path.realpath = orig_realpath
 
 
 def test_runtime_compat_mapping_beats_compatdata(steam):
