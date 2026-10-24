@@ -1,0 +1,36 @@
+# Risk of Rain Returns adapter (Proton, app 1337520, GameMaker). Sources: ADAPTERS-RESEARCH.md section 7.
+# The config folder is known (%APPDATA%\Risk_of_Rain_Returns\user_<id>) [S] but not the file or its format,
+# so this adapter measures only until `gopt find-settings riskofrainreturns` names the file on the PC.
+
+[game]
+id = "riskofrainreturns"
+name = "Risk of Rain Returns"
+appid = 1337520
+runtime = "proton"
+program = "Risk of Rain Returns.exe"   # [U]
+processes = ["Risk of Rain Returns.exe"]
+headroom = 1.30                        # late game (many enemies and items) is far heavier than stage 1
+
+[files.settings]
+note = "PCGamingWiki: %APPDATA%\\Risk_of_Rain_Returns\\user_<id>\\ inside the prefix; file name and format unknown"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "For the tuning runs: VSync off and any frame rate cap off in the video options [U: option names]",
+  "KWin rule if it opens on the LG: class 'steam_app_1337520' (substring), Screen Force = AGON (DP-2)",
+]
+
+[benchmark]
+scene = "stage 1"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Risk of Rain Returns benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Single player, same survivor and difficulty every run; press Shift+F2 when stage 1 starts.
+ 3. Play the first 60 s of stage 1, then quit the game fully.
+"""

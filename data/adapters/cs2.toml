@@ -1,0 +1,158 @@
+# Counter-Strike 2 adapter (native Linux, app 730). Sources and status tags: ADAPTERS-RESEARCH.md table C1.
+
+[game]
+id = "cs2"
+name = "Counter-Strike 2"
+appid = 730
+runtime = "native"
+program = "cs2"
+processes = ["cs2"]
+headroom = 1.00
+
+[files.settings]
+path = "{userdata}/730/local/cfg/cs2_video.txt"
+format = "keyvalues"
+keyroot = "video.cfg"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = ["-condebug"]
+forbid = ["-high", "-threads", "-autoconfig", "LD_PRELOAD", "-vulkan"]
+
+[[run_overrides]]
+key = "setting.mat_vsync"
+value = "0"
+status = "P"
+why = "VSync must be off while measuring"
+
+[[settings]]
+id = "fsr"
+label = "FidelityFX Super Resolution"
+key = "setting.videocfg_fsr_detail"
+levels = ["4", "3", "2", "1", "0"]
+labels = ["Performance", "Balanced", "Quality", "Ultra Quality", "Disabled (native)"]
+cost = [1.00, 1.15, 1.29, 1.38, 1.54]
+cpu = false
+visual = 3
+upscaling = true
+# Native first; FSR Quality only when no native rung reaches the goal (same rule as DLSS for Warframe).
+fallback = "2"
+status = "U"
+
+[[settings]]
+id = "shadows"
+label = "Global Shadow Quality"
+key = "setting.videocfg_shadow_quality"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Very High"]
+cost = [1.00, 1.09, 1.15, 1.29]
+cpu = true
+visual = 4
+status = "U"
+
+[[settings]]
+id = "dynamic_shadows"
+label = "Dynamic Shadows"
+key = "setting.videocfg_dynamic_shadows"
+levels = ["0", "1"]
+labels = ["Sun only", "All"]
+cost = [1.00, 1.03]
+cpu = true
+visual = 2
+status = "U"
+
+[[settings]]
+id = "textures"
+label = "Model / Texture Detail"
+key = "setting.videocfg_texture_detail"
+levels = ["0", "1", "2"]
+labels = ["Low", "Medium", "High"]
+cost = [1.00, 1.01, 1.03]
+cpu = false
+visual = 3
+vram_mb = [6000, 7300, 8900]
+status = "U"
+
+[[settings]]
+id = "texture_filtering"
+label = "Texture Filtering Mode"
+key = "setting.r_texturefilteringquality"
+levels = ["0", "2", "3", "4", "5"]
+labels = ["Bilinear", "Anisotropic 2x", "Anisotropic 4x", "Anisotropic 8x", "Anisotropic 16x"]
+cost = [1.00, 1.002, 1.004, 1.007, 1.01]
+cpu = false
+visual = 3
+status = "U"
+
+[[settings]]
+id = "shader_detail"
+label = "Shader Detail"
+key = "setting.shaderquality"
+levels = ["0", "1"]
+labels = ["Low", "High"]
+cost = [1.00, 1.057]
+cpu = false
+visual = 2
+status = "U"
+
+[[settings]]
+id = "particles"
+label = "Particle Detail"
+key = "setting.videocfg_particle_detail"
+levels = ["0", "1", "2", "3"]
+labels = ["Low", "Medium", "High", "Very High"]
+cost = [1.00, 1.02, 1.05, 1.11]
+cpu = true
+visual = 2
+status = "U"
+
+[[settings]]
+id = "ambient_occlusion"
+label = "Ambient Occlusion"
+key = "setting.videocfg_ao_detail"
+levels = ["0", "1", "2"]
+labels = ["Disabled", "Medium", "High"]
+cost = [1.00, 1.047, 1.05]
+cpu = false
+visual = 2
+status = "U"
+
+[[settings]]
+id = "msaa"
+label = "Multisampling Anti-Aliasing"
+key = "setting.msaa_samples"
+levels = ["0", "2", "4", "8"]
+labels = ["None", "2x MSAA", "4x MSAA", "8x MSAA"]
+cost = [1.00, 1.06, 1.12, 1.22]
+cpu = false
+visual = 3
+status = "S"
+
+[[settings]]
+id = "cmaa"
+label = "CMAA2"
+key = "setting.r_csgo_cmaa_enable"
+levels = ["0", "1"]
+labels = ["Off", "On"]
+cost = [1.00, 1.01]
+cpu = false
+visual = 2
+status = "S"
+
+# setting.videocfg_hdr_detail is left alone: a real file shows "-1" and the value meanings are unverified [U].
+
+[benchmark]
+scene = "workshop 3240880604 CS2 FPS BENCHMARK DUST2"
+duration_s = 90
+confirm_duration_s = 90
+instructions = """
+CS2 benchmark (same every run):
+ 1. Subscribe once to workshop item 3240880604 ("CS2 FPS BENCHMARK DUST2" by Angel).
+ 2. Start CS2 from Steam with the launch option set as printed above.
+ 3. Play > Workshop Maps > CS2 FPS BENCHMARK > Go. The flythrough starts by itself.
+ 4. Press Shift+F2 as soon as the map has loaded to start the MangoHud log.
+ 5. Let the benchmark finish; its own Avg FPS and P1 appear in the console (cross check).
+ 6. Quit CS2 fully.
+"""

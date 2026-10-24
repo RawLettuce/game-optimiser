@@ -1,0 +1,40 @@
+# Brotato adapter (Proton, app 1942280). Sources and status tags: ADAPTERS-RESEARCH.md section 5.
+# Options live in save_v2.json next to the save progress [S]. No setting with a known fps cost was found,
+# so this adapter measures only; `gopt find-settings brotato` and `discover` fill in the keys on the PC.
+# A write to this file is checked key by key against the whole file (the progress must never change).
+
+[game]
+id = "brotato"
+name = "Brotato"
+appid = 1942280
+runtime = "proton"
+program = "Brotato.exe"            # [U]
+processes = ["Brotato.exe"]
+headroom = 1.30                    # late waves (many enemies and projectiles) are far heavier than early ones
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/AppData/Roaming/Brotato/*/save_v2.json"
+format = "json"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = []
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Turn Steam Cloud off for Brotato before any tool edits save_v2.json (Steam > Properties > General) [S]",
+  "For the tuning runs: frame rate cap off and VSync off in the options [U: option names]",
+]
+
+[benchmark]
+scene = "fixed early run"
+duration_s = 60
+confirm_duration_s = 60
+instructions = """
+Brotato benchmark (about 60 s):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. New run: same character, same starting weapon and Danger 0 every time.
+ 3. Press Shift+F2 at the start of wave 1 and play wave 1 to 3 normally.
+ 4. Quit the game fully. Late waves are much heavier: log one with `gopt measure brotato --free-play`.
+"""

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "game-optimiser"
+version = "0.2.0"
+description = "Tune a Steam game's settings towards an fps goal on Linux: config files and launch options only, MangoHud measured, dry run by default."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+gopt = "gopt.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gopt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

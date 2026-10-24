@@ -1,0 +1,128 @@
+# Borderlands 3 adapter (Proton, app 397540). Sources and status tags: ADAPTERS-RESEARCH.md section 3.
+# The settings file is known [S]; every key name below is a guess (guess = true), so nothing is written to
+# GameUserSettings.ini until `gopt discover borderlands3` has confirmed the keys on the PC. Until then the
+# adapter measures with the built-in benchmark only.
+
+[game]
+id = "borderlands3"
+name = "Borderlands 3"
+appid = 397540
+runtime = "proton"
+program = "Borderlands3.exe"                 # [U] exe under OakGame/Binaries/Win64 [S]; confirm with ps
+processes = ["Borderlands3.exe", "OakGame-Win64-Shipping.exe"]
+headroom = 1.10                              # the built-in benchmark is representative of play [S]
+
+[files.settings]
+path = "{compatdata}/pfx/drive_c/users/steamuser/Documents/My Games/Borderlands 3/Saved/Config/WindowsNoEditor/GameUserSettings.ini"
+format = "ini"                                # Unreal Engine 4 ini; keys are "Section::Key"
+status = "S"
+
+[launch_options]
+remove_patterns = ["gamescope"]
+ensure_prefix = "mangohud"
+ensure_args = ["-NoStartupMovies"]            # [U] skips the intro videos; harmless if ignored
+forbid = ["PROTON_USE_WINED3D", "LD_PRELOAD"]
+advice = [
+  "Options > Visuals: Display Mode Borderless, Resolution 3840x2160, Frame Rate Limiter Unlimited and VSync Off for the tuning runs",
+  "Graphics API: DirectX 11 first (DirectX 12 compiles shaders for 2 to 3 minutes at each start and runs through vkd3d-proton) [S]",
+  "KWin rule if it opens on the LG: class 'steam_app_397540' (substring), Screen Force = AGON (DP-2), as for Warframe",
+]
+
+# Ordered by measured or reported cost. Levels follow Unreal's 0..4 scalability scale [S]; labels are the menu's.
+[[settings]]
+id = "volumetric_fog"
+label = "Volumetric Fog"
+key = "/Script/OakGame.OakGameUserSettings::VolumetricFogQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["Very Low", "Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.04, 1.08, 1.20, 1.33]         # Ultra to Off about 24 percent fps, Ultra to Medium about 22 percent [S]
+cpu = false
+visual = 3
+guess = true
+status = "U"
+
+[[settings]]
+id = "ssr"
+label = "Screen Space Reflections"
+key = "/Script/OakGame.OakGameUserSettings::ScreenSpaceReflectionQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["Very Low", "Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.02, 1.04, 1.10, 1.14]         # significant, gains at Medium with almost no visual loss [S]
+cpu = false
+visual = 2
+guess = true
+status = "U"
+
+[[settings]]
+id = "material"
+label = "Material Quality"
+key = "/Script/OakGame.OakGameUserSettings::MaterialQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["Very Low", "Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.03, 1.06, 1.10, 1.14]         # the only other setting with a significant effect [S]
+cpu = false
+visual = 3
+guess = true
+status = "U"
+
+[[settings]]
+id = "shadows"
+label = "Shadows"
+key = "ScalabilityGroups::sg.ShadowQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["Very Low", "Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.02, 1.05, 1.08, 1.11]         # estimate, no measured source
+cpu = true
+visual = 4
+guess = true
+status = "U"
+
+[[settings]]
+id = "foliage"
+label = "Foliage Detail"
+key = "ScalabilityGroups::sg.FoliageQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["Very Low", "Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.02, 1.04, 1.07, 1.10]         # one guide rates it very large, others do not [S]
+cpu = true
+visual = 2
+guess = true
+status = "U"
+
+[[settings]]
+id = "texture_streaming"
+label = "Texture Streaming"
+key = "ScalabilityGroups::sg.TextureQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["Very Low", "Low", "Medium", "High", "Ultra"]
+cost = [1.00, 1.00, 1.01, 1.01, 1.02]         # trivial fps cost, big visual loss below Medium [S]
+cpu = false
+visual = 4
+vram_mb = [3000, 3500, 4500, 6000, 7500]
+guess = true
+status = "U"
+
+[[settings]]
+id = "antialiasing"
+label = "Anti-Aliasing"
+key = "ScalabilityGroups::sg.AntiAliasingQuality"
+levels = ["0", "1", "2", "3", "4"]
+labels = ["None", "FXAA", "Low TAA", "Medium TAA", "High TAA"]
+cost = [1.00, 1.01, 1.02, 1.03, 1.04]         # estimate
+cpu = false
+visual = 4
+guess = true
+status = "U"
+
+[benchmark]
+scene = "built-in benchmark"
+duration_s = 105
+confirm_duration_s = 105
+instructions = """
+Borderlands 3 benchmark (built in, about 105 s, same every run):
+ 1. Start the game from Steam with the launch option set as printed above.
+ 2. Options > Visuals > Benchmark (menu path unverified; it is in the options menu). Press Shift+F2 when the
+    benchmark scene starts to begin the MangoHud log.
+ 3. Let it finish (the game also writes its own frame time file); quit the game fully.
+Note: the benchmark resets to default settings when it sees new hardware [S].
+"""
